@@ -92,7 +92,7 @@ Impression: Mild cardiomegaly consistent with known ischaemic heart disease.
 Recommend echocardiographic correlation.
 Reported by: Dr. A. Nair, MD (Radiodiagnosis)`;
 
-const TRANSLATIONS: Record<string, string> = {
+const TRANSLATIONS = {
   ta: `Patient: Ramesh Kumar | Age: 58
 OUTPATIENT PRESCRIPTION — Department of General Medicine
 Date of consultation: 14 March 2024
@@ -141,7 +141,7 @@ export const SAMPLE_CASE: Omit<ClinicalDoc, "id" | "processed">[] = [
     classification: "Outpatient Prescription",
     classifierConfidence: 91.4,
     originalText: LOREM_TA,
-    translatedText: TRANSLATIONS.ta,
+    translatedText: TRANSLATIONS["ta"],
     ocrConfidence: 86.4,
     translationQuality: 89.8,
   },
@@ -153,7 +153,7 @@ export const SAMPLE_CASE: Omit<ClinicalDoc, "id" | "processed">[] = [
     classification: "Discharge Summary",
     classifierConfidence: 93.1,
     originalText: LOREM_TE,
-    translatedText: TRANSLATIONS.te,
+    translatedText: TRANSLATIONS["te"],
     ocrConfidence: 88.1,
     translationQuality: 90.2,
   },
@@ -165,7 +165,7 @@ export const SAMPLE_CASE: Omit<ClinicalDoc, "id" | "processed">[] = [
     classification: "Lab Test Panel",
     classifierConfidence: 89.7,
     originalText: LOREM_ES,
-    translatedText: TRANSLATIONS.es,
+    translatedText: TRANSLATIONS["es"],
     ocrConfidence: 84.9,
     translationQuality: 92.5,
   },
@@ -177,7 +177,7 @@ export const SAMPLE_CASE: Omit<ClinicalDoc, "id" | "processed">[] = [
     classification: "Surgical Note",
     classifierConfidence: 87.6,
     originalText: LOREM_HI,
-    translatedText: TRANSLATIONS.hi,
+    translatedText: TRANSLATIONS["hi"],
     ocrConfidence: 82.7,
     translationQuality: 88.4,
   },
@@ -189,7 +189,7 @@ export const SAMPLE_CASE: Omit<ClinicalDoc, "id" | "processed">[] = [
     classification: "Diagnostic Imaging Report",
     classifierConfidence: 95.2,
     originalText: EN_IMAGING,
-    translatedText: TRANSLATIONS.en,
+    translatedText: TRANSLATIONS["en"],
     ocrConfidence: 89.6,
     translationQuality: 96.1,
   },
@@ -225,7 +225,7 @@ export function classifyFile(fileName: string): { classification: DocClass; conf
   const lower = fileName.toLowerCase();
   const hit = CLASS_HINTS.find((c) => c.keys.some((k) => lower.includes(k)));
   const h = hash(lower);
-  const classification = hit ? hit.value : ALL_CLASSES[h % ALL_CLASSES.length];
+  const classification: DocClass = hit ? hit.value : ALL_CLASSES[h % ALL_CLASSES.length]!;
   const confidence = Number((85 + (h % 110) / 10).toFixed(1));
   return { classification, confidence };
 }
@@ -238,7 +238,7 @@ export function detectLanguage(fileName: string) {
     "Spanish (es-ES)",
     "English (en-IN)",
   ];
-  return langs[hash(fileName) % langs.length];
+  return langs[hash(fileName) % langs.length]!;
 }
 
 export function ocrRange(seed: string) {
