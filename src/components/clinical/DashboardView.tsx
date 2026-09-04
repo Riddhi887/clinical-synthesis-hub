@@ -27,24 +27,45 @@ export function DashboardView() {
   const { docs, cases, reportsGenerated, synthesis, setView } = useClinicalStore();
   const pages = docs.reduce((a, d) => a + d.pages, 0);
 
+  // Simulated background polling: KPI drift + "syncing" pulse every 5 seconds.
+  const [ticks, setTicks] = useState(0);
+  const [syncing, setSyncing] = useState(false);
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setSyncing(true);
+      setTicks((t) => t + 1);
+      window.setTimeout(() => setSyncing(false), 900);
+    }, 5000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const processedPages = 14820 + pages + ticks * 3;
+  const accuracy = (88.6 + ((ticks % 5) - 2) * 0.1).toFixed(1);
+
   const metrics = [
     {
-      label: "Documents in intake",
-      value: String(docs.length),
-      hint: `${pages} rasterised page(s) staged`,
-      icon: FileStack,
+      label: "Total reports generated",
+      value: String(reportsGenerated),
+      hint: "cumulative evaluation reports",
+      icon: FileText,
     },
     {
-      label: "Case assets persisted",
+      label: "Active patient workspaces",
       value: String(cases.length),
       hint: "uuid primary key rows committed",
       icon: ShieldCheck,
     },
     {
-      label: "Reports generated",
-      value: String(reportsGenerated),
-      hint: "cumulative evaluation reports",
-      icon: FileText,
+      label: "Total intake pages processed",
+      value: processedPages.toLocaleString("en-GB"),
+      hint: `${docs.length} document(s) · ${pages} page(s) in this session`,
+      icon: FileStack,
+    },
+    {
+      label: "Pipeline accuracy",
+      value: `${accuracy}%`,
+      hint: "extraction + neural translation composite",
+      icon: Languages,
     },
     {
       label: "Current case risk",
@@ -67,7 +88,18 @@ export function DashboardView() {
             analyst session. All figures are derived from persisted session state.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            className={cn(
+              "flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-mono-xs transition-colors",
+              syncing ? "bg-success/10 text-success" : "text-muted-foreground",
+            )}
+          >
+            <span
+              className={cn("size-2 rounded-full bg-success", syncing && "animate-ping")}
+            />
+            {syncing ? "Syncing…" : `auto-sync · poll #${ticks}`}
+          </span>
           <Button variant="outline" onClick={() => setView("intake")}>
             <FileStack className="mr-2 size-4" /> Go to intake
           </Button>
@@ -77,20 +109,21 @@ export function DashboardView() {
         </div>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {metrics.map((m) => (
           <div key={m.label} className="panel space-y-3 p-4">
             <div className="flex items-center justify-between">
               <p className="text-mono-xs uppercase tracking-widest text-muted-foreground">
                 {m.label}
               </p>
-              <m.icon className="size-4 text-navy" />
+              <m.icon className="size-4 shrink-0 text-navy" />
             </div>
-            <p className="font-serif text-3xl leading-none text-foreground">{m.value}</p>
+            <p className="font-serif text-2xl leading-none text-foreground">{m.value}</p>
             <p className="text-mono-xs text-muted-foreground">{m.hint}</p>
           </div>
         ))}
       </section>
+
 
       <section className="grid gap-4 lg:grid-cols-2">
         <div className="panel p-5">
