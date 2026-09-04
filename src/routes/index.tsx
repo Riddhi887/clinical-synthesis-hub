@@ -1,24 +1,71 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { Toaster } from "@/components/ui/sonner";
+import { AppShell } from "@/components/clinical/AppShell";
+import { AuthScreen } from "@/components/clinical/AuthScreen";
+import { DashboardView } from "@/components/clinical/DashboardView";
+import { IntakeView } from "@/components/clinical/IntakeView";
+import { OcrView } from "@/components/clinical/OcrView";
+import { ReportView } from "@/components/clinical/ReportView";
+import { SynthesisView } from "@/components/clinical/SynthesisView";
+import { WorkspaceView } from "@/components/clinical/WorkspaceView";
+import { ClinicalStoreProvider, useClinicalStore } from "@/lib/clinical/store";
 
-// No head() here: the home route inherits title/description/og/twitter from
-// __root.tsx, and ships no og:image so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
+const TITLE = "Clinical Health Synthesis System — Medical Records Synthesis";
+const DESCRIPTION =
+  "Multilingual clinical record intake, OCR and neural translation, entity synthesis, patient timeline building and executive medical evaluation reporting.";
+
 export const Route = createFileRoute("/")({
+  head: () => ({
+    meta: [
+      { title: TITLE },
+      { name: "description", content: DESCRIPTION },
+      { property: "og:title", content: TITLE },
+      { property: "og:description", content: DESCRIPTION },
+    ],
+  }),
   component: Index,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
 function Index() {
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
-    </div>
+    <ClinicalStoreProvider>
+      <AppContent />
+      <Toaster />
+    </ClinicalStoreProvider>
+  );
+}
+
+function AppContent() {
+  const { user, view, hydrated } = useClinicalStore();
+  const [lastSync, setLastSync] = useState("--:--:--");
+
+  useEffect(() => {
+    const tick = () =>
+      setLastSync(new Date().toLocaleTimeString("en-GB", { hour12: false }));
+    tick();
+    const id = window.setInterval(tick, 5000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  if (!hydrated) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <p className="text-mono-xs text-muted-foreground">restoring session state…</p>
+      </div>
+    );
+  }
+
+  if (!user) return <AuthScreen />;
+
+  return (
+    <AppShell lastSync={lastSync}>
+      {view === "dashboard" && <DashboardView />}
+      {view === "workspace" && <WorkspaceView />}
+      {view === "intake" && <IntakeView />}
+      {view === "ocr" && <OcrView />}
+      {view === "synthesis" && <SynthesisView />}
+      {view === "report" && <ReportView />}
+    </AppShell>
   );
 }
