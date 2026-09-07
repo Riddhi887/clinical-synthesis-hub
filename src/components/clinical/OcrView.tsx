@@ -104,7 +104,11 @@ export function OcrView() {
                     key={d.id}
                     size="sm"
                     variant={current?.id === d.id ? "default" : "outline"}
-                    className="text-mono-xs"
+                    className={
+                      current?.id === d.id
+                        ? "text-primary-foreground"
+                        : "text-mono-xs"
+                    }
                     onClick={() => setSelected(d.id)}
                   >
                     {d.language.split(" ")[0]}
