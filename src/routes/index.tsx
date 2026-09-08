@@ -11,9 +11,9 @@ import { SynthesisView } from "@/components/clinical/SynthesisView";
 import { WorkspaceView } from "@/components/clinical/WorkspaceView";
 import { ClinicalStoreProvider, useClinicalStore } from "@/lib/clinical/store";
 
-const TITLE = "Clinical Health Synthesis System — Medical Records Synthesis";
+const TITLE = "Clinical Records Workspace | Medical Reports";
 const DESCRIPTION =
-  "Multilingual clinical record intake, OCR and neural translation, entity synthesis, patient timeline building and executive medical evaluation reporting.";
+  "Review multilingual medical records, patient timelines, clinical findings, care gaps, and formal medical reports.";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -51,7 +51,7 @@ function AppContent() {
   if (!hydrated) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <p className="text-mono-xs text-muted-foreground">restoring session state…</p>
+         <p className="text-sm text-muted-foreground">Preparing your clinical workspace…</p>
       </div>
     );
   }

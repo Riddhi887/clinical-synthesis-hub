@@ -20,7 +20,7 @@ export function OcrView() {
     if (!docs.length || running) return;
     setRunning(true);
     setProgress(0);
-    appendLog("[pipeline] Initiating OCR + neural translation batch across staged artefacts");
+    appendLog("Preparing imported records for review");
     const total = docs.length;
     for (let i = 0; i < total; i++) {
       const doc = docs[i]!;
@@ -31,13 +31,13 @@ export function OcrView() {
       }
       setProgress(Math.round(((i + 1) / total) * 100));
     }
-    appendLog("[pipeline] Batch complete — all artefacts marked processed=true");
+    appendLog("All records are ready for clinical review");
     setActive(null);
     finishOcr(docs.map((d) => ({ ...d, processed: true })));
     setRunning(false);
     setSelected((s) => s ?? docs[0]!.id);
-    toast.success("OCR & translation complete", {
-      description: `${total} artefact(s) processed with deterministic fallback corpus.`,
+    toast.success("Records processed and translated", {
+      description: `${total} record(s) are ready for clinical review.`,
     });
   };
 
@@ -49,16 +49,15 @@ export function OcrView() {
       <section className="panel flex flex-wrap items-end justify-between gap-4 p-5">
         <div className="space-y-1">
           <p className="text-mono-xs uppercase tracking-widest text-muted-foreground">step 2</p>
-          <h2 className="font-serif text-2xl text-foreground">OCR &amp; neural translation</h2>
+           <h2 className="text-2xl font-semibold text-foreground">Processing &amp; translating medical records</h2>
           <p className="max-w-2xl text-sm text-muted-foreground">
-            Rasterise each artefact, recognise regional-language glyphs, extract clinical entities
-            and translate into formal English clinical prose.
+             Review scanned records, recognise medical details, and prepare clear English clinical text.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button onClick={run} disabled={running || docs.length === 0}>
             <Play className="mr-2 size-4" />
-            {running ? "Processing…" : ocrComplete ? "Re-run pipeline" : "Run OCR pipeline"}
+             {running ? "Processing…" : ocrComplete ? "Process again" : "Process records"}
           </Button>
           <Button variant="outline" disabled={!ocrComplete} onClick={() => setView("synthesis")}>
             Continue to synthesis
@@ -70,7 +69,7 @@ export function OcrView() {
         <section className="panel p-10 text-center">
           <ScanSearch className="mx-auto size-8 text-navy" />
           <p className="mt-3 text-sm text-muted-foreground">
-            No artefacts staged. Return to Document Intake to upload or load the sample case.
+             No records have been added. Return to Import Records to upload or load the sample case.
           </p>
           <Button className="mt-4" variant="outline" onClick={() => setView("intake")}>
             Go to intake
@@ -125,7 +124,7 @@ export function OcrView() {
                   </Badge>
                   <span className="text-mono-xs text-muted-foreground">{current.name}</span>
                   <span className="rounded-full bg-success/15 px-2 py-0.5 text-mono-xs text-success">
-                    OCR {current.ocrConfidence}%
+                     recognition {current.ocrConfidence}%
                   </span>
                   <span className="rounded-full bg-navy/10 px-2 py-0.5 text-mono-xs text-navy">
                     translation {current.translationQuality}%

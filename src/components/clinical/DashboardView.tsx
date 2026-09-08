@@ -29,7 +29,6 @@ export function DashboardView() {
   const { docs, cases, reportsGenerated, synthesis, setView } = useClinicalStore();
   const pages = docs.reduce((a, d) => a + d.pages, 0);
 
-  // Simulated background polling: KPI drift + "syncing" pulse every 5 seconds.
   const [ticks, setTicks] = useState(0);
   const [syncing, setSyncing] = useState(false);
   useEffect(() => {
@@ -48,13 +47,13 @@ export function DashboardView() {
     {
       label: "Total reports generated",
       value: String(reportsGenerated),
-      hint: "cumulative evaluation reports",
+      hint: "completed clinical reports",
       icon: FileText,
     },
     {
       label: "Active patient workspaces",
       value: String(cases.length),
-      hint: "uuid primary key rows committed",
+      hint: "cases available for review",
       icon: ShieldCheck,
     },
     {
@@ -64,15 +63,15 @@ export function DashboardView() {
       icon: FileStack,
     },
     {
-      label: "Pipeline accuracy",
+      label: "Record review confidence",
       value: `${accuracy}%`,
-      hint: "extraction + neural translation composite",
+      hint: "combined recognition and translation",
       icon: Languages,
     },
     {
       label: "Current case risk",
       value: synthesis?.risk ?? "—",
-      hint: synthesis ? `case ${synthesis.caseId}` : "no synthesis in session",
+      hint: synthesis ? `case ${synthesis.caseId}` : "no active clinical summary",
       icon: AlertTriangle,
     },
   ];
@@ -82,12 +81,11 @@ export function DashboardView() {
       <section className="panel flex flex-wrap items-end justify-between gap-4 p-5">
         <div className="space-y-1">
           <p className="text-mono-xs uppercase tracking-widest text-muted-foreground">
-            operational overview
+             Clinical overview
           </p>
-          <h2 className="font-serif text-2xl text-foreground">Synthesis pipeline dashboard</h2>
+           <h2 className="text-2xl font-semibold text-foreground">Patient records overview</h2>
           <p className="max-w-2xl text-sm text-muted-foreground">
-            Intake volumes, document-type distribution and pipeline readiness across the current
-            analyst session. All figures are derived from persisted session state.
+             A clear view of current cases, record volumes, review status, and clinical risk.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -100,13 +98,13 @@ export function DashboardView() {
             <span
               className={cn("size-2 rounded-full bg-success", syncing && "animate-ping")}
             />
-            {syncing ? "Syncing…" : `auto-sync · poll #${ticks}`}
+             {syncing ? "Updating…" : "Records current"}
           </span>
           <Button variant="outline" onClick={() => setView("intake")}>
-            <FileStack className="mr-2 size-4" /> Go to intake
+             <FileStack className="mr-2 size-4" /> Import records
           </Button>
           <Button onClick={() => setView("ocr")}>
-            <ScanSearch className="mr-2 size-4" /> Run pipeline
+             <ScanSearch className="mr-2 size-4" /> Process records
           </Button>
         </div>
       </section>
@@ -179,7 +177,7 @@ export function DashboardView() {
           <div className="mb-4 flex items-center justify-between">
             <div>
               <h3 className="font-serif text-lg text-foreground">Document type distribution</h3>
-              <p className="text-mono-xs text-muted-foreground">auto-classifier output totals</p>
+               <p className="text-mono-xs text-muted-foreground">records grouped by clinical type</p>
             </div>
             <Languages className="size-4 text-navy" />
           </div>
@@ -213,13 +211,13 @@ export function DashboardView() {
       <section className="panel p-5">
         <div className="mb-3 flex items-center gap-2">
           <Activity className="size-4 text-navy" />
-          <h3 className="font-serif text-lg text-foreground">Pipeline readiness</h3>
+           <h3 className="font-serif text-lg text-foreground">Review progress</h3>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {[
             { step: "Step 1", label: "Document intake", done: docs.length > 0 },
-            { step: "Step 2", label: "OCR & translation", done: useReadiness("ocr") },
-            { step: "Step 3", label: "Synthesis & timeline", done: useReadiness("synthesis") },
+             { step: "Step 2", label: "Processing & translation", done: useReadiness("ocr") },
+             { step: "Step 3", label: "Clinical summary & timeline", done: useReadiness("synthesis") },
             { step: "Step 4", label: "Evaluation report", done: useReadiness("report") },
           ].map((s) => (
             <div

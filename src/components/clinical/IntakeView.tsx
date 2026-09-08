@@ -19,7 +19,7 @@ export function IntakeView() {
     }));
     const n = addFiles(payload);
     toast.success(`${n} document(s) staged`, {
-      description: "Auto-classified and committed to asset_slot(raw_documents).",
+      description: "Records were added and grouped by clinical document type.",
     });
   };
 
@@ -31,11 +31,10 @@ export function IntakeView() {
       <section className="panel flex flex-wrap items-end justify-between gap-4 p-5">
         <div className="space-y-1">
           <p className="text-mono-xs uppercase tracking-widest text-muted-foreground">step 1</p>
-          <h2 className="font-serif text-2xl text-foreground">Document intake</h2>
+           <h2 className="text-2xl font-semibold text-foreground">Import medical records</h2>
           <p className="max-w-2xl text-sm text-muted-foreground">
-            Bulk-upload scanned prescriptions, discharge summaries, laboratory panels, surgical notes
-            and imaging reports. Each artefact is auto-classified on ingest and assigned a UUID
-            primary key in the simulated persistence layer.
+             Add prescriptions, discharge summaries, laboratory results, surgical notes, and imaging
+             reports. Each record is organised automatically for clinical review.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -43,7 +42,7 @@ export function IntakeView() {
             <FolderOpen className="mr-2 size-4" /> Load sample case
           </Button>
           <Button disabled={docs.length === 0} onClick={() => setView("ocr")}>
-            Continue to OCR
+             Continue to processing
           </Button>
         </div>
       </section>
@@ -91,7 +90,7 @@ export function IntakeView() {
       <section className="panel overflow-hidden">
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-3">
           <div>
-            <h3 className="font-serif text-lg text-foreground">Staged artefacts</h3>
+           <h3 className="font-serif text-lg text-foreground">Records ready for review</h3>
             <p className="text-mono-xs text-muted-foreground">
               {docs.length} document(s) · {pages} page(s) · {sizeMb} MB
             </p>
@@ -102,7 +101,7 @@ export function IntakeView() {
               size="sm"
               onClick={() => {
                 clearIntake();
-                toast.info("Intake cleared", { description: "All staged asset rows dropped." });
+                 toast.info("Records cleared", { description: "All imported records were removed." });
               }}
             >
               <Trash2 className="mr-2 size-4" /> Clear intake
@@ -121,14 +120,14 @@ export function IntakeView() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm text-foreground">{d.name}</p>
                   <p className="text-mono-xs text-muted-foreground">
-                    uuid {d.id} · {d.language} · {d.pages}p · {d.sizeKb} KB
+                     Record ID {d.id} · {d.language} · {d.pages} pages · {d.sizeKb} KB
                   </p>
                 </div>
                 <Badge variant="secondary" className="text-mono-xs">
                   {d.classification}
                 </Badge>
                 <span className="text-mono-xs text-muted-foreground">
-                  classifier {d.classifierConfidence}%
+                   confidence {d.classifierConfidence}%
                 </span>
                 <Button
                   variant="ghost"

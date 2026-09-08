@@ -23,7 +23,7 @@ export function SynthesisView() {
       const s = buildSynthesis();
       setBusy(false);
       toast.success("Chronological synthesis complete", {
-        description: `Case ${s.caseId} committed with ${s.timeline.length} timeline events.`,
+        description: `Case ${s.caseId} now includes ${s.timeline.length} care events.`,
       });
     }, 900);
   };
@@ -33,16 +33,15 @@ export function SynthesisView() {
       <section className="panel flex flex-wrap items-end justify-between gap-4 p-5">
         <div className="space-y-1">
           <p className="text-mono-xs uppercase tracking-widest text-muted-foreground">step 3</p>
-          <h2 className="font-serif text-2xl text-foreground">Synthesis &amp; clinical timeline</h2>
+           <h2 className="text-2xl font-semibold text-foreground">Clinical summary &amp; care timeline</h2>
           <p className="max-w-2xl text-sm text-muted-foreground">
-            Entity resolution across all translated artefacts, chronological reconstruction of the
-            care pathway, and gap analysis against expected follow-up intervals.
+             A consolidated patient history, chronological care pathway, and review of missing follow-up information.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button onClick={build} disabled={busy || !ocrComplete || docs.length === 0}>
             <GitMerge className="mr-2 size-4" />
-            {busy ? "Synthesising…" : synthesis ? "Re-synthesise" : "Build synthesis"}
+             {busy ? "Preparing…" : synthesis ? "Refresh summary" : "Prepare summary"}
           </Button>
           <Button variant="outline" disabled={!synthesis} onClick={() => setView("report")}>
             Continue to report
@@ -53,10 +52,10 @@ export function SynthesisView() {
       {!ocrComplete && (
         <section className="panel p-10 text-center">
           <p className="text-sm text-muted-foreground">
-            Run the OCR &amp; neural translation step before synthesis.
+             Process and translate the medical records before preparing the clinical summary.
           </p>
           <Button className="mt-4" variant="outline" onClick={() => setView("ocr")}>
-            Go to OCR
+             Go to record processing
           </Button>
         </section>
       )}
@@ -65,8 +64,7 @@ export function SynthesisView() {
         <section className="panel p-10 text-center">
           <GitMerge className="mx-auto size-8 text-navy" />
           <p className="mt-3 text-sm text-muted-foreground">
-            Artefacts are processed. Build the synthesis to resolve entities and reconstruct the
-            timeline.
+             Records are ready. Prepare the summary to organise findings and reconstruct the care timeline.
           </p>
         </section>
       )}
@@ -139,7 +137,7 @@ export function SynthesisView() {
           <Tabs defaultValue="timeline">
             <TabsList>
               <TabsTrigger value="timeline">Chronological timeline</TabsTrigger>
-              <TabsTrigger value="entities">Resolved entities</TabsTrigger>
+               <TabsTrigger value="entities">Clinical findings</TabsTrigger>
               <TabsTrigger value="gaps">Gap analysis</TabsTrigger>
             </TabsList>
 
@@ -167,7 +165,7 @@ export function SynthesisView() {
               <div className="grid gap-4 lg:grid-cols-2">
                 <section className="panel p-5">
                   <h3 className="mb-3 font-serif text-lg text-foreground">
-                    Diagnoses (ICD-10 mapped)
+                     Recorded diagnoses
                   </h3>
                   <ul className="space-y-2">
                     {synthesis.diagnoses.map((d) => (
@@ -182,7 +180,7 @@ export function SynthesisView() {
                 </section>
                 <section className="panel p-5">
                   <h3 className="mb-3 flex items-center gap-2 font-serif text-lg text-foreground">
-                    <Pill className="size-4 text-navy" /> Active pharmacotherapy
+                     <Pill className="size-4 text-navy" /> Current medications
                   </h3>
                   <ul className="space-y-2 text-sm">
                     {synthesis.medications.map((m) => (
