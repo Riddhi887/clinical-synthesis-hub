@@ -32,20 +32,20 @@ export function AuthScreen() {
           <span className="flex size-10 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
             <Activity className="size-5" />
           </span>
-          <span className="font-serif text-lg tracking-tight">Clinical Health Synthesis System</span>
+          <span className="text-lg font-semibold">Clinical Records Workspace</span>
         </div>
         <div className="max-w-md space-y-5">
-          <h1 className="font-serif text-4xl leading-tight">
-            Multilingual medical records, synthesised into evaluation-grade clinical narrative.
+          <h1 className="text-4xl font-semibold leading-tight">
+            A clear, complete view of every patient record.
           </h1>
           <p className="text-sm leading-relaxed text-sidebar-foreground/70">
-            Bulk intake, OCR rasterisation, neural translation, entity resolution and executive
-            report generation — one deterministic pipeline across four supervised steps.
+            Review records in multiple languages, follow the patient’s care history, identify missing
+            information, and prepare a formal clinical report in one focused workspace.
           </p>
-          <ul className="space-y-2 text-mono-xs text-sidebar-foreground/60">
-            <li>tesseract.js · easyocr · layoutlm-v3</li>
-            <li>Clinical-AI-Apollo/Medical-NER · samant/medical-ner</li>
-            <li>MarianMT translation pipeline · Llama-3.3-70B-Instruct synthesis</li>
+          <ul className="space-y-2 text-sm text-sidebar-foreground/70">
+            <li>• Multilingual record review</li>
+            <li>• Chronological clinical summaries</li>
+            <li>• Formal reports and follow-up recommendations</li>
           </ul>
         </div>
         <p className="text-mono-xs text-sidebar-foreground/45">
@@ -57,11 +57,11 @@ export function AuthScreen() {
         <form onSubmit={submit} className="w-full max-w-sm space-y-6">
           <div className="space-y-2">
             <span className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1 text-mono-xs text-muted-foreground">
-              <ShieldCheck className="size-3.5" /> mock authentication
+               <ShieldCheck className="size-3.5" /> Secure demonstration access
             </span>
-            <h2 className="font-serif text-2xl text-foreground">Analyst sign-in</h2>
+             <h2 className="text-2xl font-semibold text-foreground">Clinical reviewer sign-in</h2>
             <p className="text-sm text-muted-foreground">
-              Demo credentials are pre-filled. No external identity provider is contacted.
+               Demonstration credentials are pre-filled for this review workspace.
             </p>
           </div>
 
@@ -99,8 +99,7 @@ export function AuthScreen() {
           </Button>
 
           <p className="text-mono-xs text-muted-foreground">
-            Session state persists in browser storage (simulated PostgreSQL schema with UUID primary
-            keys). Uploaded files, telemetry and reports survive navigation.
+             Your imported records and reports remain available while you move between sections.
           </p>
         </form>
       </div>

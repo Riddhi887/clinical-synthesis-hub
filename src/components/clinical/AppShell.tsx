@@ -22,18 +22,16 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { useClinicalStore, type ViewKey } from "@/lib/clinical/store";
-import { ArchitecturePanel } from "./ArchitecturePanel";
-
 const MAIN: { key: ViewKey; label: string; icon: typeof BarChart3 }[] = [
-  { key: "dashboard", label: "Dashboard", icon: BarChart3 },
-  { key: "workspace", label: "Workspace & Cases", icon: Briefcase },
+  { key: "dashboard", label: "Overview", icon: BarChart3 },
+  { key: "workspace", label: "Patient Cases", icon: Briefcase },
 ];
 
 const PIPELINE: { key: ViewKey; label: string; step: string; icon: typeof FileStack }[] = [
-  { key: "intake", label: "Document Intake", step: "Step 1", icon: FileStack },
-  { key: "ocr", label: "OCR & Neural Translation", step: "Step 2", icon: ScanSearch },
-  { key: "synthesis", label: "Synthesis & Timeline", step: "Step 3", icon: GitMerge },
-  { key: "report", label: "Medical Evaluation Report", step: "Step 4", icon: FileText },
+  { key: "intake", label: "Import Records", step: "Step 1", icon: FileStack },
+  { key: "ocr", label: "Process & Translate", step: "Step 2", icon: ScanSearch },
+  { key: "synthesis", label: "Clinical Summary", step: "Step 3", icon: GitMerge },
+  { key: "report", label: "Executive Report", step: "Step 4", icon: FileText },
 ];
 
 export function AppShell({ children, lastSync }: { children: ReactNode; lastSync: string }) {
@@ -47,23 +45,23 @@ export function AppShell({ children, lastSync }: { children: ReactNode; lastSync
   };
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <aside className="hidden w-72 shrink-0 flex-col justify-between bg-sidebar px-4 py-5 lg:flex">
+    <div className="flex h-screen overflow-hidden bg-background">
+      <aside className="hidden h-screen w-64 shrink-0 flex-col justify-between overflow-y-auto bg-sidebar px-4 py-5 lg:flex">
         <div className="space-y-6">
           <div className="flex items-center gap-2.5">
             <span className="flex size-9 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
               <Activity className="size-4.5" />
             </span>
             <div className="leading-tight">
-              <p className="font-serif text-sm text-sidebar-foreground">Clinical Health</p>
-              <p className="text-mono-xs text-sidebar-foreground/55">synthesis system</p>
+              <p className="text-sm font-semibold text-sidebar-foreground">Clinical Records</p>
+              <p className="text-xs text-sidebar-foreground/60">care review workspace</p>
             </div>
           </div>
 
           <nav className="space-y-6">
             <div className="space-y-1">
               <p className="px-2 text-[0.66rem] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
-                Main views
+                Workspace
               </p>
               {MAIN.map((item) => (
                 <NavButton
@@ -78,7 +76,7 @@ export function AppShell({ children, lastSync }: { children: ReactNode; lastSync
 
             <div className="space-y-1">
               <p className="px-2 text-[0.66rem] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
-                Pipeline workflow
+                Clinical workflow
               </p>
               {PIPELINE.map((item) => (
                 <NavButton
@@ -95,22 +93,21 @@ export function AppShell({ children, lastSync }: { children: ReactNode; lastSync
           </nav>
         </div>
 
-        <div className="space-y-3">
-          <ArchitecturePanel />
-          <p className="text-mono-xs text-sidebar-foreground/35">
-            build 4.2.1 · deterministic fallback active
+        <div className="border-t border-sidebar-border pt-4">
+          <p className="flex items-center gap-2 text-xs text-sidebar-foreground/65">
+            <span className="size-2 rounded-full bg-success" /> Ready for clinical review
           </p>
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-border bg-surface/90 px-5 py-3 backdrop-blur">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="z-20 flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border bg-card px-5 py-3 lg:px-8">
           <div className="min-w-0">
-            <h1 className="truncate font-serif text-lg text-foreground">
-              Clinical Health Synthesis System
+            <h1 className="truncate text-lg font-semibold text-foreground">
+              Clinical History &amp; Medical Records
             </h1>
             <p className="text-mono-xs text-muted-foreground">
-              multilingual medical record intake · synthesis · evaluation reporting
+              Patient record review and medical reporting
             </p>
           </div>
 
@@ -121,7 +118,7 @@ export function AppShell({ children, lastSync }: { children: ReactNode; lastSync
                 <span className="relative inline-flex size-2 rounded-full bg-success" />
               </span>
               <span className="text-mono-xs text-muted-foreground">
-                system operational · auto-sync active · {lastSync}
+                Records current · updated {lastSync}
               </span>
             </div>
 
@@ -136,7 +133,7 @@ export function AppShell({ children, lastSync }: { children: ReactNode; lastSync
                       {user ?? "analyst"}
                     </span>
                     <span className="block text-mono-xs text-muted-foreground">
-                      Clinical Data Analyst
+                    Clinical Reviewer
                     </span>
                   </span>
                 </button>
@@ -145,12 +142,12 @@ export function AppShell({ children, lastSync }: { children: ReactNode; lastSync
                 <DropdownMenuLabel className="space-y-0.5">
                   <span className="block text-sm">{user}</span>
                   <span className="block text-mono-xs font-normal text-muted-foreground">
-                    role: Clinical Data Analyst
+                    Clinical Reviewer
                   </span>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem disabled className="text-mono-xs">
-                  session persisted locally
+                  Secure review session
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -182,7 +179,7 @@ export function AppShell({ children, lastSync }: { children: ReactNode; lastSync
           ))}
         </div>
 
-        <main className="min-w-0 flex-1 px-5 py-6">{children}</main>
+        <main className="min-w-0 flex-1 overflow-y-auto px-5 py-6 lg:px-8 lg:py-8">{children}</main>
       </div>
     </div>
   );

@@ -6,7 +6,7 @@
 
 /*
  * Clinical Health Synthesis System — design system.
- * Wheat white surfaces, deep navy structure, slate text, emerald/amber status.
+ * Warm clinical surfaces, deep navy structure, slate text, emerald/amber status.
  * All colors are oklch semantic tokens. Never hardcode colors in components.
  */
 
@@ -58,18 +58,18 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-  --font-sans: "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
-  --font-serif: "Newsreader", Georgia, serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
-  --shadow-panel: 0 1px 2px oklch(0.21 0.045 260 / 0.06), 0 8px 24px oklch(0.21 0.045 260 / 0.07);
-  --shadow-raised: 0 1px 0 oklch(0.21 0.045 260 / 0.05), 0 2px 8px oklch(0.21 0.045 260 / 0.06);
+  --font-sans: Calibri, "Segoe UI", Arial, sans-serif;
+  --font-serif: Calibri, "Segoe UI", Arial, sans-serif;
+  --font-mono: Calibri, "Segoe UI", Arial, sans-serif;
+  --shadow-panel: 0 1px 2px oklch(0.21 0.045 260 / 0.04), 0 10px 28px oklch(0.21 0.045 260 / 0.06);
+  --shadow-raised: 0 1px 2px oklch(0.21 0.045 260 / 0.04), 0 5px 16px oklch(0.21 0.045 260 / 0.05);
 }
 
 :root {
   --radius: 0.5rem;
-  --background: oklch(0.988 0.007 85);
+  --background: oklch(0.978 0.008 85);
   --foreground: oklch(0.215 0.045 262);
-  --surface: oklch(0.972 0.011 87);
+  --surface: oklch(0.988 0.006 85);
   --surface-foreground: oklch(0.215 0.045 262);
   --card: oklch(1 0.003 90);
   --card-foreground: oklch(0.215 0.045 262);
@@ -77,7 +77,7 @@
   --popover-foreground: oklch(0.215 0.045 262);
   --primary: oklch(0.215 0.045 262);
   --primary-foreground: oklch(0.988 0.007 85);
-  --navy: oklch(0.34 0.115 265);
+  --navy: oklch(0.32 0.075 245);
   --navy-foreground: oklch(0.988 0.007 85);
   --secondary: oklch(0.945 0.012 250);
   --secondary-foreground: oklch(0.3 0.04 258);
@@ -87,7 +87,7 @@
   --accent-foreground: oklch(0.26 0.05 262);
   --destructive: oklch(0.577 0.225 27);
   --destructive-foreground: oklch(0.99 0.005 85);
-  --success: oklch(0.7 0.145 163);
+  --success: oklch(0.55 0.1 168);
   --success-foreground: oklch(0.21 0.06 165);
   --warning: oklch(0.78 0.155 71);
   --warning-foreground: oklch(0.29 0.08 62);
@@ -101,7 +101,7 @@
   --chart-3: oklch(0.78 0.155 71);
   --chart-4: oklch(0.55 0.09 258);
   --chart-5: oklch(0.62 0.13 300);
-  --sidebar: oklch(0.215 0.045 262);
+  --sidebar: oklch(0.27 0.055 245);
   --sidebar-foreground: oklch(0.9 0.012 250);
   --sidebar-primary: oklch(0.34 0.115 265);
   --sidebar-primary-foreground: oklch(0.988 0.007 85);
@@ -149,14 +149,14 @@
 
 @utility text-mono-xs {
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   line-height: 1.15rem;
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
 }
 
 @utility panel {
   background-color: var(--color-card);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-raised);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-panel);
 }
