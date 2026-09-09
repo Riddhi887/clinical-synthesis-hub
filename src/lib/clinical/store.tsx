@@ -179,10 +179,11 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
         patch((s) => ({ docs: s.docs.filter((d) => d.id !== id), reportReady: false })),
       clearIntake: () =>
         patch({ docs: [], logs: [], ocrComplete: false, synthesis: null, reportReady: false }),
-      appendLog: (line) =>
-        patch((s) => ({
-          logs: [...s.logs, `${new Date().toLocaleTimeString("en-GB", { hour12: false })}  ${line}`].slice(-400),
-        })),
+      // Developer-only telemetry: routed to the browser console, never to the UI.
+      appendLog: (line) => {
+        const ts = new Date().toLocaleTimeString("en-GB", { hour12: false });
+        console.info(`[clinical-pipeline ${ts}] ${line}`);
+      },
       finishOcr: (docs) => patch({ docs, ocrComplete: true }),
       buildSynthesis: () => {
         let result!: Synthesis;

@@ -6,14 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { TELEMETRY_SCRIPT, type ClinicalDoc } from "@/lib/clinical/data";
 import { useClinicalStore } from "@/lib/clinical/store";
-import { TelemetryConsole } from "./TelemetryConsole";
+
 
 export function OcrView() {
   const { docs, ocrComplete, appendLog, finishOcr, setView } = useClinicalStore();
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState(ocrComplete ? 100 : 0);
   const [active, setActive] = useState<string | null>(null);
-  const [consoleOpen, setConsoleOpen] = useState(true);
+  
   const [selected, setSelected] = useState<string | null>(docs[0]?.id ?? null);
 
   const run = async () => {
@@ -87,11 +87,6 @@ export function OcrView() {
             <Progress value={progress} />
           </section>
 
-          <TelemetryConsole
-            open={consoleOpen}
-            onToggle={() => setConsoleOpen((o) => !o)}
-            running={running}
-          />
 
           <section className="panel overflow-hidden">
             <header className="flex flex-wrap items-center gap-2 border-b border-border px-5 py-3">
