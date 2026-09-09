@@ -9,7 +9,7 @@ import { OcrView } from "@/components/clinical/OcrView";
 import { ReportView } from "@/components/clinical/ReportView";
 import { SynthesisView } from "@/components/clinical/SynthesisView";
 import { WorkspaceView } from "@/components/clinical/WorkspaceView";
-import { ClinicalStoreProvider, useClinicalStore } from "@/lib/clinical/store";
+import { useClinicalStore } from "@/lib/clinical/store";
 
 const TITLE = "Clinical Records Workspace | Medical Reports";
 const DESCRIPTION =
@@ -29,10 +29,10 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   return (
-    <ClinicalStoreProvider>
+    <>
       <AppContent />
       <Toaster />
-    </ClinicalStoreProvider>
+    </>
   );
 }
 
