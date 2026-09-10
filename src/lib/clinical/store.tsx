@@ -23,6 +23,7 @@ import {
 export type ViewKey =
   | "dashboard"
   | "workspace"
+  | "patient"
   | "intake"
   | "ocr"
   | "synthesis"
@@ -38,6 +39,17 @@ export interface CaseAsset {
   hasReport: boolean;
 }
 
+/** A patient-scoped folder: every asset here belongs to exactly one case id. */
+export interface PatientFolder {
+  caseId: string;
+  patientName: string;
+  mrn: string;
+  createdAt: number;
+  docs: ClinicalDoc[];
+  synthesis: Synthesis | null;
+  reportReady: boolean;
+}
+
 interface PersistedState {
   user: string | null;
   view: ViewKey;
@@ -47,6 +59,8 @@ interface PersistedState {
   synthesis: Synthesis | null;
   reportReady: boolean;
   cases: CaseAsset[];
+  folders: Record<string, PatientFolder>;
+  activeCaseId: string | null;
   reportsGenerated: number;
 }
 
@@ -61,6 +75,8 @@ const initialState: PersistedState = {
   synthesis: null,
   reportReady: false,
   cases: [],
+  folders: {},
+  activeCaseId: null,
   reportsGenerated: 128,
 };
 
