@@ -2,7 +2,6 @@ import { toast } from "sonner";
 import {
   Activity,
   BarChart3,
-  Briefcase,
   FileStack,
   FileText,
   GitMerge,
@@ -24,7 +23,6 @@ import { cn } from "@/lib/utils";
 import { useClinicalStore, type ViewKey } from "@/lib/clinical/store";
 const MAIN: { key: ViewKey; label: string; icon: typeof BarChart3 }[] = [
   { key: "dashboard", label: "Overview", icon: BarChart3 },
-  { key: "workspace", label: "Patient Cases", icon: Briefcase },
 ];
 
 const PIPELINE: { key: ViewKey; label: string; step: string; icon: typeof FileStack }[] = [
@@ -35,10 +33,11 @@ const PIPELINE: { key: ViewKey; label: string; step: string; icon: typeof FileSt
 ];
 
 export function AppShell({ children, lastSync }: { children: ReactNode; lastSync: string }) {
-  const { view, setView, user, logout, docs, synthesis, reportReady } = useClinicalStore();
+  const { view, setView, user, logout, docs, ocrComplete, synthesis, reportReady } = useClinicalStore();
 
   const badgeFor = (key: ViewKey) => {
     if (key === "intake" && docs.length) return String(docs.length);
+    if (key === "ocr" && ocrComplete) return "✓";
     if (key === "synthesis" && synthesis) return "✓";
     if (key === "report" && reportReady) return "✓";
     return null;

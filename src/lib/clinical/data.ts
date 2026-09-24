@@ -3,15 +3,22 @@ export type DocClass =
   | "Outpatient Prescription"
   | "Lab Test Panel"
   | "Surgical Note"
-  | "Diagnostic Imaging Report";
+  | "Diagnostic Imaging Report"
+  | "Unclassified Clinical Document";
 
 export interface ClinicalDoc {
   id: string;
   name: string;
+  origin?: "sample" | "upload";
+  patientName?: string;
+  fields?: Record<string, string>;
+  processing?: boolean;
+  analyzed?: boolean;
+  sourceFile?: File;
   language: string;
   pages: number;
   sizeKb: number;
-  classification: DocClass;
+  classification?: DocClass;
   classifierConfidence: number;
   originalText: string;
   translatedText: string;
@@ -194,86 +201,6 @@ export const SAMPLE_CASE: Omit<ClinicalDoc, "id" | "processed">[] = [
     translationQuality: 96.1,
   },
 ];
-
-const CLASS_HINTS: { keys: string[]; value: DocClass }[] = [
-  { keys: ["discharge", "summary", "ipd"], value: "Discharge Summary" },
-  { keys: ["rx", "prescription", "opd", "outpatient"], value: "Outpatient Prescription" },
-  { keys: ["lab", "panel", "blood", "cbc", "path"], value: "Lab Test Panel" },
-  { keys: ["surg", "operat", "op-note", "procedure", "cath"], value: "Surgical Note" },
-  { keys: ["xray", "x-ray", "mri", "ct", "scan", "imaging", "radio"], value: "Diagnostic Imaging Report" },
-];
-
-const ALL_CLASSES: DocClass[] = [
-  "Discharge Summary",
-  "Outpatient Prescription",
-  "Lab Test Panel",
-  "Surgical Note",
-  "Diagnostic Imaging Report",
-];
-
-/** Deterministic hash so classification never depends on randomness / network. */
-function hash(input: string) {
-  let h = 2166136261;
-  for (let i = 0; i < input.length; i++) {
-    h ^= input.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return Math.abs(h);
-}
-
-export function classifyFile(fileName: string): { classification: DocClass; confidence: number } {
-  const lower = fileName.toLowerCase();
-  const hit = CLASS_HINTS.find((c) => c.keys.some((k) => lower.includes(k)));
-  const h = hash(lower);
-  const classification: DocClass = hit ? hit.value : ALL_CLASSES[h % ALL_CLASSES.length]!;
-  const confidence = Number((85 + (h % 110) / 10).toFixed(1));
-  return { classification, confidence };
-}
-
-export function detectLanguage(fileName: string) {
-  const langs = [
-    "Tamil (ta-IN)",
-    "Telugu (te-IN)",
-    "Hindi (hi-IN)",
-    "Spanish (es-ES)",
-    "English (en-IN)",
-  ];
-  return langs[hash(fileName) % langs.length]!;
-}
-
-export function ocrRange(seed: string) {
-  const h = hash(seed);
-  return {
-    ocrConfidence: Number((80 + (h % 100) / 10).toFixed(1)),
-    translationQuality: Number((85 + ((h >> 3) % 120) / 10).toFixed(1)),
-  };
-}
-
-export function genericOriginal(name: string, language: string) {
-  return `[ ${language} source scan — ${name} ]
-
-நோயாளி / रोगी / Paciente: Ramesh Kumar   •   58 yrs
-வழக்கு எண் / Caso: MRN-8839201
-
-— வரி 1 —  அறிகுறிகள்: மார்பு வலி, சோர்வு, மூச்சுத் திணறல்
-— वरी 2 —  औषधि: Metformin 500mg, Atorvastatin 20mg
-— Línea 3 — Observación: control glucémico deficiente, seguimiento en 2 semanas
-
-(rasterized 1240x1753px • ${language} glyph set • handwriting regions detected)`;
-}
-
-export function genericTranslated(name: string, classification: DocClass) {
-  return `FORMAL ENGLISH CLINICAL TEXT — ${classification}
-Source artefact: ${name}
-
-Patient: Ramesh Kumar | Age 58 | MRN 8839201
-Presenting features: chest discomfort, fatigability and exertional breathlessness.
-Active pharmacotherapy: Metformin 500 mg BD; Atorvastatin 20 mg nocte;
-Aspirin 75 mg OD. Glycaemic control documented as suboptimal.
-Assessment: known ischaemic heart disease with type 2 diabetes mellitus,
-requiring therapy reconciliation and biochemical surveillance.
-Plan: review in two weeks with repeat metabolic panel and renal profile.`;
-}
 
 export const SYNTHESIS_BASE: Omit<Synthesis, "caseId" | "createdAt"> = {
   patientName: "Ramesh Kumar",

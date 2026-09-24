@@ -7,7 +7,6 @@ import {
   FileText,
   Languages,
   ScanSearch,
-  ShieldCheck,
   TrendingUp,
 } from "lucide-react";
 import {
@@ -26,7 +25,7 @@ import { DOC_TYPE_DISTRIBUTION, INTAKE_SERIES } from "@/lib/clinical/data";
 import { useClinicalStore } from "@/lib/clinical/store";
 
 export function DashboardView() {
-  const { docs, cases, reportsGenerated, synthesis, setView } = useClinicalStore();
+  const { docs, reportsGenerated, synthesis, setView } = useClinicalStore();
   const pages = docs.reduce((a, d) => a + d.pages, 0);
 
   const [ticks, setTicks] = useState(0);
@@ -40,8 +39,16 @@ export function DashboardView() {
     return () => window.clearInterval(id);
   }, []);
 
-  const processedPages = 14820 + pages + ticks * 3;
-  const accuracy = (88.6 + ((ticks % 5) - 2) * 0.1).toFixed(1);
+  const analyzedDocs = docs.filter((doc) => doc.analyzed && doc.processed);
+  const processedPages = analyzedDocs.reduce((total, doc) => total + doc.pages, 0);
+  const accuracy = analyzedDocs.length
+    ? (
+        analyzedDocs.reduce(
+          (total, doc) => total + (doc.ocrConfidence + doc.translationQuality) / 2,
+          0,
+        ) / analyzedDocs.length
+      ).toFixed(1)
+    : "—";
 
   const metrics = [
     {
@@ -51,12 +58,6 @@ export function DashboardView() {
       icon: FileText,
     },
     {
-      label: "Active patient workspaces",
-      value: String(cases.length),
-      hint: "cases available for review",
-      icon: ShieldCheck,
-    },
-    {
       label: "Total intake pages processed",
       value: processedPages.toLocaleString("en-GB"),
       hint: `${docs.length} document(s) · ${pages} page(s) in this session`,
@@ -64,8 +65,8 @@ export function DashboardView() {
     },
     {
       label: "Record review confidence",
-      value: `${accuracy}%`,
-      hint: "combined recognition and translation",
+      value: accuracy === "—" ? accuracy : `${accuracy}%`,
+      hint: analyzedDocs.length ? "combined recognition and translation" : "no processed records",
       icon: Languages,
     },
     {

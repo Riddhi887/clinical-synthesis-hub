@@ -13,13 +13,17 @@ export function IntakeView() {
 
   const ingest = (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    const payload = Array.from(files).map((f) => ({
-      name: f.name,
-      sizeKb: Math.max(1, Math.round(f.size / 1024)),
-    }));
-    const n = addFiles(payload);
+
+    const selectedFiles = Array.from(files);
+    const n = addFiles(
+      selectedFiles.map((file) => ({
+        name: file.name,
+        sizeKb: Math.max(1, Math.round(file.size / 1024)),
+        sourceFile: file,
+      })),
+    );
     toast.success(`${n} document(s) staged`, {
-      description: "Records were added and grouped by clinical document type.",
+      description: "Records are staged. Open Process & Translation to retrieve and translate them.",
     });
   };
 
@@ -92,7 +96,7 @@ export function IntakeView() {
           <div>
            <h3 className="font-serif text-lg text-foreground">Records ready for review</h3>
             <p className="text-mono-xs text-muted-foreground">
-              {docs.length} document(s) · {pages} page(s) · {sizeMb} MB
+              {docs.length} document(s) · {pages ? `${pages} page(s) analyzed` : "pages analyzed in Process & Translation"} · {sizeMb} MB
             </p>
           </div>
           {docs.length > 0 && (
@@ -120,14 +124,12 @@ export function IntakeView() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm text-foreground">{d.name}</p>
                   <p className="text-mono-xs text-muted-foreground">
-                     Record ID {d.id} · {d.language} · {d.pages} pages · {d.sizeKb} KB
+                    Record ID {d.id} · staged for processing · {d.sizeKb} KB
                   </p>
                 </div>
-                <Badge variant="secondary" className="text-mono-xs">
-                  {d.classification}
-                </Badge>
+                <Badge variant="secondary" className="text-mono-xs">Ready to process</Badge>
                 <span className="text-mono-xs text-muted-foreground">
-                   confidence {d.classifierConfidence}%
+                   {d.sizeKb} KB
                 </span>
                 <Button
                   variant="ghost"

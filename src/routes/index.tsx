@@ -8,7 +8,6 @@ import { IntakeView } from "@/components/clinical/IntakeView";
 import { OcrView } from "@/components/clinical/OcrView";
 import { ReportView } from "@/components/clinical/ReportView";
 import { SynthesisView } from "@/components/clinical/SynthesisView";
-import { WorkspaceView } from "@/components/clinical/WorkspaceView";
 import { useClinicalStore } from "@/lib/clinical/store";
 
 const TITLE = "Clinical Records Workspace | Medical Reports";
@@ -61,7 +60,6 @@ function AppContent() {
   return (
     <AppShell lastSync={lastSync}>
       {view === "dashboard" && <DashboardView />}
-      {view === "workspace" && <WorkspaceView />}
       {view === "intake" && <IntakeView />}
       {view === "ocr" && <OcrView />}
       {view === "synthesis" && <SynthesisView />}
