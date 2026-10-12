@@ -1,4 +1,0 @@
-- [ ] Replace static dashboard chart data with persisted, session-derived metrics and add processing-status distribution.
-- [ ] Add a smooth collapsible navigation sidebar and keep the five-second sync indicator visually stable.
-- [ ] Persist session records and reports; queue additional document batches separately and process them sequentially after report completion.
-- [ ] Verify the primary intake-to-report flow, queue transitions, controls, and browser/build error signals.

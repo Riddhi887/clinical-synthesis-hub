@@ -6,12 +6,10 @@ import {
   FileText,
   GitMerge,
   LogOut,
-  PanelLeftClose,
-  PanelLeftOpen,
   ScanSearch,
   UserRound,
 } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -34,9 +32,8 @@ const PIPELINE: { key: ViewKey; label: string; step: string; icon: typeof FileSt
   { key: "report", label: "Executive Report", step: "Step 4", icon: FileText },
 ];
 
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({ children, lastSync }: { children: ReactNode; lastSync: string }) {
   const { view, setView, user, logout, docs, ocrComplete, synthesis, reportReady } = useClinicalStore();
-  const [collapsed, setCollapsed] = useState(false);
 
   const badgeFor = (key: ViewKey) => {
     if (key === "intake" && docs.length) return String(docs.length);
@@ -48,33 +45,23 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      <aside className={cn("hidden h-screen shrink-0 flex-col justify-between overflow-y-auto bg-sidebar py-5 transition-[width] duration-300 ease-in-out lg:flex", collapsed ? "w-16 px-2" : "w-64 px-4")}>
+      <aside className="hidden h-screen w-64 shrink-0 flex-col justify-between overflow-y-auto bg-sidebar px-4 py-5 lg:flex">
         <div className="space-y-6">
-          <div className={cn("flex items-center gap-2.5", collapsed && "justify-center")}>
+          <div className="flex items-center gap-2.5">
             <span className="flex size-9 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
               <Activity className="size-4.5" />
             </span>
-            {!collapsed && <div className="leading-tight">
+            <div className="leading-tight">
               <p className="text-sm font-semibold text-sidebar-foreground">Clinical Records</p>
               <p className="text-xs text-sidebar-foreground/60">care review workspace</p>
-            </div>}
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn("ml-auto text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground", collapsed && "ml-0")}
-              onClick={() => setCollapsed((value) => !value)}
-              aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}
-              title={collapsed ? "Expand navigation" : "Collapse navigation"}
-            >
-              {collapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}
-            </Button>
+            </div>
           </div>
 
           <nav className="space-y-6">
             <div className="space-y-1">
-              {!collapsed && <p className="px-2 text-[0.66rem] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
+              <p className="px-2 text-[0.66rem] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
                 Workspace
-              </p>}
+              </p>
               {MAIN.map((item) => (
                 <NavButton
                   key={item.key}
@@ -82,15 +69,14 @@ export function AppShell({ children }: { children: ReactNode }) {
                   onClick={() => setView(item.key)}
                   icon={<item.icon className="size-4" />}
                   label={item.label}
-                  collapsed={collapsed}
                 />
               ))}
             </div>
 
             <div className="space-y-1">
-              {!collapsed && <p className="px-2 text-[0.66rem] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
+              <p className="px-2 text-[0.66rem] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
                 Clinical workflow
-              </p>}
+              </p>
               {PIPELINE.map((item) => (
                 <NavButton
                   key={item.key}
@@ -100,16 +86,15 @@ export function AppShell({ children }: { children: ReactNode }) {
                   label={item.label}
                   hint={item.step}
                   badge={badgeFor(item.key)}
-                  collapsed={collapsed}
                 />
               ))}
             </div>
           </nav>
         </div>
 
-        <div className={cn("border-t border-sidebar-border pt-4", collapsed && "flex justify-center")}>
+        <div className="border-t border-sidebar-border pt-4">
           <p className="flex items-center gap-2 text-xs text-sidebar-foreground/65">
-            <span className="size-2 shrink-0 rounded-full bg-success" /> {!collapsed && "Ready for clinical review"}
+            <span className="size-2 rounded-full bg-success" /> Ready for clinical review
           </p>
         </div>
       </aside>
@@ -127,11 +112,12 @@ export function AppShell({ children }: { children: ReactNode }) {
 
           <div className="flex items-center gap-4">
             <div className="hidden items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 sm:flex">
-              <span className="flex size-2">
-                <span className="inline-flex size-2 rounded-full bg-success" />
+              <span className="relative flex size-2">
+                <span className="absolute inline-flex size-2 animate-ping rounded-full bg-success opacity-70" />
+                <span className="relative inline-flex size-2 rounded-full bg-success" />
               </span>
               <span className="text-mono-xs text-muted-foreground">
-                Session saved automatically
+                Records current · updated {lastSync}
               </span>
             </div>
 
@@ -205,7 +191,6 @@ function NavButton({
   label,
   hint,
   badge,
-  collapsed = false,
 }: {
   active: boolean;
   onClick: () => void;
@@ -213,21 +198,19 @@ function NavButton({
   label: string;
   hint?: string;
   badge?: string | null;
-  collapsed?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
       className={cn(
         "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm transition-colors",
-        collapsed && "justify-center px-2",
         active
           ? "bg-sidebar-primary text-sidebar-primary-foreground"
           : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
       )}
     >
       <span className="shrink-0">{icon}</span>
-      <span className={cn("min-w-0 flex-1 leading-tight", collapsed && "sr-only")}>
+      <span className="min-w-0 flex-1 leading-tight">
         {hint && (
           <span
             className={cn(
@@ -240,7 +223,7 @@ function NavButton({
         )}
         <span className="block truncate">{label}</span>
       </span>
-      {!collapsed && badge && (
+      {badge && (
         <span className="rounded-full bg-success/20 px-1.5 py-0.5 text-[0.62rem] text-success">
           {badge}
         </span>

@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { AppShell } from "@/components/clinical/AppShell";
 import { AuthScreen } from "@/components/clinical/AuthScreen";
@@ -36,6 +37,15 @@ function Index() {
 
 function AppContent() {
   const { user, view, hydrated } = useClinicalStore();
+  const [lastSync, setLastSync] = useState("--:--:--");
+
+  useEffect(() => {
+    const tick = () =>
+      setLastSync(new Date().toLocaleTimeString("en-GB", { hour12: false }));
+    tick();
+    const id = window.setInterval(tick, 5000);
+    return () => window.clearInterval(id);
+  }, []);
 
   if (!hydrated) {
     return (
@@ -48,7 +58,7 @@ function AppContent() {
   if (!user) return <AuthScreen />;
 
   return (
-    <AppShell>
+    <AppShell lastSync={lastSync}>
       {view === "dashboard" && <DashboardView />}
       {view === "intake" && <IntakeView />}
       {view === "ocr" && <OcrView />}

@@ -43,23 +43,10 @@ export interface PatientFolder {
   reportReady: boolean;
 }
 
-export interface ReportSnapshot {
-  caseId: string;
-  patientName: string;
-  createdAt: number;
-  documentCount: number;
-  documentIds: string[];
-  synthesis: Synthesis;
-}
-
 interface PersistedState {
   user: string | null;
   view: ViewKey;
   docs: ClinicalDoc[];
-  queuedDocs: ClinicalDoc[];
-  processingActive: boolean;
-  autoProcessNextBatch: boolean;
-  reportHistory: ReportSnapshot[];
   logs: string[];
   ocrComplete: boolean;
   synthesis: Synthesis | null;
@@ -71,17 +58,12 @@ interface PersistedState {
 }
 
 const STORAGE_KEY = "chss.session.v9";
-export const SESSION_SYNC_INTERVAL_MS = 5000;
 const LEGACY_STORAGE_KEYS = ["chss.session.v2", "chss.session.v3", "chss.session.v4", "chss.session.v5", "chss.session.v6", "chss.session.v7", "chss.session.v8"];
 
 const initialState: PersistedState = {
   user: null,
   view: "dashboard",
   docs: [],
-  queuedDocs: [],
-  processingActive: false,
-  autoProcessNextBatch: false,
-  reportHistory: [],
   logs: [],
   ocrComplete: false,
   synthesis: null,
@@ -129,99 +111,6 @@ interface StoreValue extends PersistedState {
   markOcrComplete: () => void;
   buildSynthesis: () => Synthesis;
   markReportReady: () => void;
-  startProcessing: () => void;
-  consumeAutoProcessNextBatch: () => void;
-}
-
-export function placeDocumentsInQueue<T>(
-  active: T[],
-  queued: T[],
-  incoming: T[],
-  processing: boolean,
-) {
-  return processing
-    ? { active, queued: [...queued, ...incoming] }
-    : { active: [...active, ...incoming], queued };
-}
-
-export function promoteNextBatch<T>(active: T[], queued: T[]) {
-  return queued.length ? { active: queued, queued: [] as T[] } : { active, queued };
-}
-
-const ASSET_DB_NAME = "chss-session-assets";
-const ASSET_STORE_NAME = "uploaded-files";
-
-function openAssetDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = window.indexedDB.open(ASSET_DB_NAME, 1);
-    request.onupgradeneeded = () => {
-      const database = request.result;
-      if (!database.objectStoreNames.contains(ASSET_STORE_NAME)) {
-        database.createObjectStore(ASSET_STORE_NAME);
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-async function storeSourceFile(id: string, file: File) {
-  const database = await openAssetDb();
-  await new Promise<void>((resolve, reject) => {
-    const transaction = database.transaction(ASSET_STORE_NAME, "readwrite");
-    transaction.objectStore(ASSET_STORE_NAME).put(file.slice(0, file.size, file.type), id);
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error);
-    transaction.onabort = () => reject(transaction.error);
-  });
-  database.close();
-}
-
-async function readSourceFile(id: string, name: string): Promise<File | undefined> {
-  try {
-    const database = await openAssetDb();
-    const blob = await new Promise<Blob | undefined>((resolve, reject) => {
-      const transaction = database.transaction(ASSET_STORE_NAME, "readonly");
-      const request = transaction.objectStore(ASSET_STORE_NAME).get(id);
-      request.onsuccess = () => resolve(request.result as Blob | undefined);
-      request.onerror = () => reject(request.error);
-    });
-    database.close();
-    return blob ? new File([blob], name, { type: blob.type }) : undefined;
-  } catch (error) {
-    console.warn("Unable to restore a pending source file", error);
-    return undefined;
-  }
-}
-
-async function deleteSourceFile(id: string) {
-  try {
-    const database = await openAssetDb();
-    await new Promise<void>((resolve, reject) => {
-      const transaction = database.transaction(ASSET_STORE_NAME, "readwrite");
-      transaction.objectStore(ASSET_STORE_NAME).delete(id);
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error);
-    });
-    database.close();
-  } catch (error) {
-    console.warn("Unable to remove a stored source file", error);
-  }
-}
-
-async function clearStoredSourceFiles() {
-  try {
-    const database = await openAssetDb();
-    await new Promise<void>((resolve, reject) => {
-      const transaction = database.transaction(ASSET_STORE_NAME, "readwrite");
-      transaction.objectStore(ASSET_STORE_NAME).clear();
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error);
-    });
-    database.close();
-  } catch (error) {
-    console.warn("Unable to clear stored source files", error);
-  }
 }
 
 const StoreContext = createContext<StoreValue | null>(null);
@@ -230,64 +119,31 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<PersistedState>(initialState);
   const [hydrated, setHydrated] = useState(false);
   const loaded = useRef(false);
-  const stateRef = useRef(state);
-  stateRef.current = state;
 
-  // Restore session data and pending uploaded files before exposing the workspace.
+  // Hydrate from persisted session (LocalStorage persistence layer).
   useEffect(() => {
-    let cancelled = false;
     try {
       LEGACY_STORAGE_KEYS.forEach((key) => window.localStorage.removeItem(key));
       const raw = window.localStorage.getItem(STORAGE_KEY);
-      const parsed = raw ? (JSON.parse(raw) as Partial<PersistedState>) : {};
-      const restored = { ...initialState, ...parsed };
-      void Promise.all([
-        Promise.all((restored.docs ?? []).map(async (doc) => ({
-          ...doc,
-          receivedAt: doc.receivedAt ?? Date.now(),
-          ...(!doc.sourceFile ? { sourceFile: await readSourceFile(doc.id, doc.name) } : {}),
-        }))),
-        Promise.all((restored.queuedDocs ?? []).map(async (doc) => ({
-          ...doc,
-          receivedAt: doc.receivedAt ?? Date.now(),
-          ...(!doc.sourceFile ? { sourceFile: await readSourceFile(doc.id, doc.name) } : {}),
-        }))),
-      ]).then(([docs, queuedDocs]) => {
-        if (cancelled) return;
-        setState({ ...restored, docs, queuedDocs });
-        loaded.current = true;
-        setHydrated(true);
-      });
+      if (raw) {
+        const parsed = JSON.parse(raw) as Partial<PersistedState>;
+        setState({ ...initialState, ...parsed });
+      }
     } catch {
       // Deterministic fallback: ignore corrupt state, start clean.
-      loaded.current = true;
-      setHydrated(true);
     }
-    return () => { cancelled = true; };
+    loaded.current = true;
+    setHydrated(true);
   }, []);
 
   useEffect(() => {
     if (!loaded.current) return;
     try {
-      window.localStorage.setItem(STORAGE_KEY, serializeSession(state));
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch {
       /* storage unavailable — session stays in memory */
     }
   }, [state]);
-
-  // Periodic persistence is deliberately outside React state, so it cannot flicker the UI.
-  useEffect(() => {
-    const sync = () => {
-      if (!loaded.current) return;
-      try {
-        window.localStorage.setItem(STORAGE_KEY, serializeSession(stateRef.current));
-      } catch {
-        /* session remains available in memory */
-      }
-    };
-    const interval = window.setInterval(sync, SESSION_SYNC_INTERVAL_MS);
-    return () => window.clearInterval(interval);
-  }, []);
 
   const patch = useCallback(
     (p: Partial<PersistedState> | ((s: PersistedState) => Partial<PersistedState>)) =>
@@ -307,7 +163,6 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
         } catch {
           /* noop */
         }
-        void clearStoredSourceFiles();
       },
       setView: (view) => patch({ view }),
       addFiles: (files) => {
@@ -318,7 +173,6 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
             origin: "upload",
             processing: true,
             analyzed: false,
-            receivedAt: Date.now(),
             ...(f.sourceFile ? { sourceFile: f.sourceFile } : {}),
             language: f.language ?? "",
             pages: f.sourceFile ? 0 : 0,
@@ -332,17 +186,11 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
             processed: false,
           };
         });
-        created.forEach((doc) => {
-          if (doc.sourceFile) void storeSourceFile(doc.id, doc.sourceFile).catch((error) =>
-            console.warn("Unable to save an uploaded source file", error),
-          );
-        });
-        patch((s) => {
-          const next = placeDocumentsInQueue(s.docs, s.queuedDocs, created, s.processingActive);
-          return s.processingActive
-            ? { docs: next.active, queuedDocs: next.queued }
-            : { docs: next.active, queuedDocs: next.queued, ocrComplete: false, reportReady: false, synthesis: null };
-        });
+        patch((s) => ({
+          docs: [...s.docs, ...created],
+          ocrComplete: false,
+          reportReady: false,
+        }));
         return created.length;
       },
       updateDoc: (id, changes) =>
@@ -354,25 +202,15 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
           ...d,
           id: newUuid(),
           origin: "sample" as const,
-          receivedAt: Date.now(),
           analyzed: true,
           processed: false,
         }));
-        patch((s) => {
-          const next = placeDocumentsInQueue(s.docs, s.queuedDocs, created, s.processingActive);
-          return s.processingActive
-            ? { docs: next.active, queuedDocs: next.queued }
-            : { docs: created, queuedDocs: [], ocrComplete: false, reportReady: false, synthesis: null, logs: [] };
-        });
+        patch({ docs: created, ocrComplete: false, reportReady: false, synthesis: null, logs: [] });
       },
       removeDoc: (id) =>
-        (void deleteSourceFile(id), patch((s) => ({
-          docs: s.docs.filter((d) => d.id !== id),
-          queuedDocs: s.queuedDocs.filter((d) => d.id !== id),
-          reportReady: false,
-        }))),
+        patch((s) => ({ docs: s.docs.filter((d) => d.id !== id), reportReady: false })),
       clearIntake: () =>
-        (void clearStoredSourceFiles(), patch({ docs: [], queuedDocs: [], logs: [], ocrComplete: false, synthesis: null, reportReady: false })),
+        patch({ docs: [], logs: [], ocrComplete: false, synthesis: null, reportReady: false }),
       appendLog: (line) => {
         const ts = new Date().toLocaleTimeString("en-GB", { hour12: false });
         const entry = `[${ts}] ${line}`;
@@ -382,21 +220,14 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
       finishOcr: (docs) => patch({ docs, ocrComplete: true }),
       markOcrComplete: () =>
         patch((s) => {
-          const complete = s.docs.length > 0 && s.docs.every((doc) => doc.processed && doc.translatedText.trim());
+          const complete = s.docs.length > 0 && s.docs.every(
+            (doc) => doc.analyzed && doc.originalText.trim() && doc.translatedText.trim(),
+          );
           return {
-            docs: s.docs.map((doc) => ({ ...doc, processed: Boolean(doc.analyzed && doc.originalText.trim() && doc.translatedText.trim()), processing: false })),
+            docs: s.docs.map((doc) => ({ ...doc, processed: complete && Boolean(doc.analyzed), processing: false })),
             ocrComplete: complete,
-            processingActive: false,
           };
         }),
-      startProcessing: () => patch((s) => ({
-        processingActive: true,
-        ocrComplete: false,
-        reportReady: false,
-        synthesis: null,
-        docs: s.docs.map((doc) => ({ ...doc, processing: !doc.processed })),
-      })),
-      consumeAutoProcessNextBatch: () => patch({ autoProcessNextBatch: false }),
       buildSynthesis: () => {
         let result!: Synthesis;
         setState((s) => {
@@ -467,35 +298,13 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
         return result;
       },
       markReportReady: () =>
-        patch((s) => {
-          if (!s.synthesis) return {};
-          const snapshot: ReportSnapshot = {
-            caseId: s.synthesis.caseId,
-            patientName: s.synthesis.patientName,
-            createdAt: Date.now(),
-            documentCount: s.docs.length,
-            documentIds: s.docs.map((doc) => doc.id),
-            synthesis: s.synthesis,
-          };
-          const promoted = promoteNextBatch(s.docs, s.queuedDocs);
-          const hasNextBatch = promoted.active !== s.docs;
-          return {
-            reportHistory: [...s.reportHistory, snapshot],
-            reportReady: !hasNextBatch,
-            reportsGenerated: s.reportsGenerated + 1,
-            cases: s.cases.map((c) =>
-              c.caseId === s.synthesis?.caseId ? { ...c, hasReport: true } : c,
-            ),
-            ...(hasNextBatch ? {
-              docs: promoted.active,
-              queuedDocs: promoted.queued,
-              ocrComplete: false,
-              synthesis: null,
-              autoProcessNextBatch: true,
-              view: "ocr" as const,
-            } : {}),
-          };
-        }),
+        patch((s) => ({
+          reportReady: true,
+          reportsGenerated: s.reportReady ? s.reportsGenerated : s.reportsGenerated + 1,
+          cases: s.cases.map((c) =>
+            c.caseId === s.synthesis?.caseId ? { ...c, hasReport: true } : c,
+          ),
+        })),
     };
   }, [state, hydrated, patch]);
 
