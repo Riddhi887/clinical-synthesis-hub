@@ -10,6 +10,8 @@ export interface ClinicalDoc {
   id: string;
   name: string;
   origin?: "sample" | "upload";
+  /** When the record entered this session; powers the dashboard intake trend. */
+  uploadedAt?: number;
   patientName?: string;
   fields?: Record<string, string>;
   processing?: boolean;
