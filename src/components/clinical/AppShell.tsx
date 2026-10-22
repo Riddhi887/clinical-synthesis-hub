@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   Activity,
@@ -6,6 +7,8 @@ import {
   FileText,
   GitMerge,
   LogOut,
+  PanelLeftClose,
+  PanelLeftOpen,
   ScanSearch,
   UserRound,
 } from "lucide-react";
@@ -32,8 +35,20 @@ const PIPELINE: { key: ViewKey; label: string; step: string; icon: typeof FileSt
   { key: "report", label: "Executive Report", step: "Step 4", icon: FileText },
 ];
 
-export function AppShell({ children, lastSync }: { children: ReactNode; lastSync: string }) {
-  const { view, setView, user, logout, docs, ocrComplete, synthesis, reportReady } = useClinicalStore();
+export function AppShell({ children }: { children: ReactNode }) {
+  const {
+    view,
+    setView,
+    user,
+    logout,
+    docs,
+    ocrComplete,
+    synthesis,
+    reportReady,
+    sidebarCollapsed,
+    toggleSidebar,
+  } = useClinicalStore();
+  const collapsed = sidebarCollapsed;
 
   const badgeFor = (key: ViewKey) => {
     if (key === "intake" && docs.length) return String(docs.length);
@@ -45,23 +60,47 @@ export function AppShell({ children, lastSync }: { children: ReactNode; lastSync
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      <aside className="hidden h-screen w-64 shrink-0 flex-col justify-between overflow-y-auto bg-sidebar px-4 py-5 lg:flex">
+      <aside
+        className={cn(
+          "hidden h-screen shrink-0 flex-col justify-between overflow-y-auto bg-sidebar px-4 py-5 transition-[width] duration-300 ease-in-out lg:flex",
+          collapsed ? "w-16" : "w-64",
+        )}
+      >
         <div className="space-y-6">
-          <div className="flex items-center gap-2.5">
-            <span className="flex size-9 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
-              <Activity className="size-4.5" />
-            </span>
-            <div className="leading-tight">
-              <p className="text-sm font-semibold text-sidebar-foreground">Clinical Records</p>
-              <p className="text-xs text-sidebar-foreground/60">care review workspace</p>
+          <div
+            className={cn(
+              "flex items-center",
+              collapsed ? "flex-col gap-3" : "justify-between gap-2.5",
+            )}
+          >
+            <div className={cn("flex items-center", collapsed ? "flex-col gap-2" : "gap-2.5")}>
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
+                <Activity className="size-4.5" />
+              </span>
+              {!collapsed && (
+                <div className="leading-tight">
+                  <p className="text-sm font-semibold text-sidebar-foreground">Clinical Records</p>
+                  <p className="text-xs text-sidebar-foreground/60">care review workspace</p>
+                </div>
+              )}
             </div>
+            <button
+              onClick={toggleSidebar}
+              aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}
+              title={collapsed ? "Expand navigation" : "Collapse navigation"}
+              className="flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
+            >
+              {collapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}
+            </button>
           </div>
 
           <nav className="space-y-6">
             <div className="space-y-1">
-              <p className="px-2 text-[0.66rem] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
-                Workspace
-              </p>
+              {!collapsed && (
+                <p className="px-2 text-[0.66rem] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
+                  Workspace
+                </p>
+              )}
               {MAIN.map((item) => (
                 <NavButton
                   key={item.key}
@@ -69,14 +108,17 @@ export function AppShell({ children, lastSync }: { children: ReactNode; lastSync
                   onClick={() => setView(item.key)}
                   icon={<item.icon className="size-4" />}
                   label={item.label}
+                  collapsed={collapsed}
                 />
               ))}
             </div>
 
             <div className="space-y-1">
-              <p className="px-2 text-[0.66rem] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
-                Clinical workflow
-              </p>
+              {!collapsed && (
+                <p className="px-2 text-[0.66rem] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
+                  Clinical workflow
+                </p>
+              )}
               {PIPELINE.map((item) => (
                 <NavButton
                   key={item.key}
@@ -86,6 +128,7 @@ export function AppShell({ children, lastSync }: { children: ReactNode; lastSync
                   label={item.label}
                   hint={item.step}
                   badge={badgeFor(item.key)}
+                  collapsed={collapsed}
                 />
               ))}
             </div>
@@ -93,8 +136,14 @@ export function AppShell({ children, lastSync }: { children: ReactNode; lastSync
         </div>
 
         <div className="border-t border-sidebar-border pt-4">
-          <p className="flex items-center gap-2 text-xs text-sidebar-foreground/65">
-            <span className="size-2 rounded-full bg-success" /> Ready for clinical review
+          <p
+            className={cn(
+              "flex items-center text-xs text-sidebar-foreground/65",
+              collapsed ? "justify-center" : "gap-2",
+            )}
+          >
+            <span className="size-2 shrink-0 rounded-full bg-success" />
+            {!collapsed && "Ready for clinical review"}
           </p>
         </div>
       </aside>
@@ -111,15 +160,7 @@ export function AppShell({ children, lastSync }: { children: ReactNode; lastSync
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="hidden items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 sm:flex">
-              <span className="relative flex size-2">
-                <span className="absolute inline-flex size-2 animate-ping rounded-full bg-success opacity-70" />
-                <span className="relative inline-flex size-2 rounded-full bg-success" />
-              </span>
-              <span className="text-mono-xs text-muted-foreground">
-                Records current · updated {lastSync}
-              </span>
-            </div>
+            <SyncClock />
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -184,6 +225,31 @@ export function AppShell({ children, lastSync }: { children: ReactNode; lastSync
   );
 }
 
+/** Isolated 5-second sync clock: keeps the tick out of the wider app render tree. */
+function SyncClock() {
+  const [lastSync, setLastSync] = useState("--:--:--");
+
+  useEffect(() => {
+    const tick = () =>
+      setLastSync(new Date().toLocaleTimeString("en-GB", { hour12: false }));
+    tick();
+    const id = window.setInterval(tick, 5000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  return (
+    <div className="hidden items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 sm:flex">
+      <span className="relative flex size-2">
+        <span className="absolute inline-flex size-2 animate-ping rounded-full bg-success opacity-70" />
+        <span className="relative inline-flex size-2 rounded-full bg-success" />
+      </span>
+      <span className="text-mono-xs text-muted-foreground">
+        Records current · updated {lastSync}
+      </span>
+    </div>
+  );
+}
+
 function NavButton({
   active,
   onClick,
@@ -191,6 +257,7 @@ function NavButton({
   label,
   hint,
   badge,
+  collapsed,
 }: {
   active: boolean;
   onClick: () => void;
@@ -198,32 +265,37 @@ function NavButton({
   label: string;
   hint?: string;
   badge?: string | null;
+  collapsed?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
+      title={collapsed ? label : undefined}
       className={cn(
         "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm transition-colors",
+        collapsed && "justify-center px-0",
         active
           ? "bg-sidebar-primary text-sidebar-primary-foreground"
           : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
       )}
     >
       <span className="shrink-0">{icon}</span>
-      <span className="min-w-0 flex-1 leading-tight">
-        {hint && (
-          <span
-            className={cn(
-              "block text-[0.62rem] uppercase tracking-widest",
-              active ? "text-sidebar-primary-foreground/70" : "text-sidebar-foreground/45",
-            )}
-          >
-            {hint}
-          </span>
-        )}
-        <span className="block truncate">{label}</span>
-      </span>
-      {badge && (
+      {!collapsed && (
+        <span className="min-w-0 flex-1 leading-tight">
+          {hint && (
+            <span
+              className={cn(
+                "block text-[0.62rem] uppercase tracking-widest",
+                active ? "text-sidebar-primary-foreground/70" : "text-sidebar-foreground/45",
+              )}
+            >
+              {hint}
+            </span>
+          )}
+          <span className="block truncate">{label}</span>
+        </span>
+      )}
+      {badge && !collapsed && (
         <span className="rounded-full bg-success/20 px-1.5 py-0.5 text-[0.62rem] text-success">
           {badge}
         </span>

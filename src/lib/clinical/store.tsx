@@ -55,6 +55,10 @@ interface PersistedState {
   folders: Record<string, PatientFolder>;
   activeCaseId: string | null;
   reportsGenerated: number;
+  /** Documents staged while a processing batch is running; processed after it finishes. */
+  queuedDocIds: string[];
+  batchActive: boolean;
+  sidebarCollapsed: boolean;
 }
 
 const STORAGE_KEY = "chss.session.v9";
@@ -72,6 +76,9 @@ const initialState: PersistedState = {
   folders: {},
   activeCaseId: null,
   reportsGenerated: 0,
+  queuedDocIds: [],
+  batchActive: false,
+  sidebarCollapsed: false,
 };
 
 /** Simulated PostgreSQL/Supabase uuid primary key generation (client-side). */
@@ -111,6 +118,10 @@ interface StoreValue extends PersistedState {
   markOcrComplete: () => void;
   buildSynthesis: () => Synthesis;
   markReportReady: () => void;
+  beginBatch: () => void;
+  endBatch: () => void;
+  takeQueued: () => string[];
+  toggleSidebar: () => void;
 }
 
 const StoreContext = createContext<StoreValue | null>(null);
@@ -119,6 +130,8 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<PersistedState>(initialState);
   const [hydrated, setHydrated] = useState(false);
   const loaded = useRef(false);
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   // Hydrate from persisted session (LocalStorage persistence layer).
   useEffect(() => {
@@ -177,6 +190,7 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
             language: f.language ?? "",
             pages: f.sourceFile ? 0 : 0,
             sizeKb: f.sizeKb,
+            uploadedAt: Date.now(),
             ...(f.classification ? { classification: f.classification } : {}),
             classifierConfidence: f.classification ? 0 : 0,
             originalText: f.originalText ?? "",
@@ -186,8 +200,14 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
             processed: false,
           };
         });
-        patch((s) => ({
+        setState((s) => ({
+          ...s,
           docs: [...s.docs, ...created],
+          // While a batch is processing, new files join the isolated queue instead
+          // of the active batch stream.
+          queuedDocIds: s.batchActive
+            ? [...s.queuedDocIds, ...created.map((d) => d.id)]
+            : s.queuedDocIds,
           ocrComplete: false,
           reportReady: false,
         }));
@@ -204,8 +224,9 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
           origin: "sample" as const,
           analyzed: true,
           processed: false,
+          uploadedAt: Date.now(),
         }));
-        patch({ docs: created, ocrComplete: false, reportReady: false, synthesis: null, logs: [] });
+        patch({ docs: created, ocrComplete: false, reportReady: false, synthesis: null, logs: [], queuedDocIds: [], batchActive: false });
       },
       removeDoc: (id) =>
         patch((s) => ({ docs: s.docs.filter((d) => d.id !== id), reportReady: false })),
@@ -305,6 +326,14 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
             c.caseId === s.synthesis?.caseId ? { ...c, hasReport: true } : c,
           ),
         })),
+      beginBatch: () => patch({ batchActive: true }),
+      endBatch: () => patch({ batchActive: false }),
+      takeQueued: () => {
+        const ids = stateRef.current.queuedDocIds;
+        setState((s) => ({ ...s, queuedDocIds: [] }));
+        return ids;
+      },
+      toggleSidebar: () => patch((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
     };
   }, [state, hydrated, patch]);
 

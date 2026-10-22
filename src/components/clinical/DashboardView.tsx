@@ -1,10 +1,13 @@
-import { useEffect, useState } from "react";
+import { useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
 import {
   Activity,
   AlertTriangle,
+  CheckCircle2,
+  Clock3,
   FileStack,
   FileText,
+  GitMerge,
   Languages,
   ScanSearch,
   TrendingUp,
@@ -13,40 +16,54 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
   Line,
   LineChart,
+  Pie,
+  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
 import { Button } from "@/components/ui/button";
-import { DOC_TYPE_DISTRIBUTION, INTAKE_SERIES } from "@/lib/clinical/data";
 import { useClinicalStore } from "@/lib/clinical/store";
 
+const DAY_MS = 86_400_000;
+const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+const TYPE_LABELS: Record<string, string> = {
+  "Discharge Summary": "Discharge",
+  "Outpatient Prescription": "Prescription",
+  "Lab Test Panel": "Lab results",
+  "Surgical Note": "Surgical",
+  "Diagnostic Imaging Report": "Imaging",
+};
+
+const TOOLTIP_STYLE = {
+  background: "var(--color-card)",
+  border: "1px solid var(--color-border)",
+  borderRadius: 8,
+  fontSize: 12,
+  color: "var(--color-foreground)",
+} as const;
+
 export function DashboardView() {
-  const { docs, reportsGenerated, synthesis, setView } = useClinicalStore();
+  const { docs, reportsGenerated, synthesis, ocrComplete, reportReady, setView } =
+    useClinicalStore();
+
+  // Documents persisted before upload timestamps existed count as this session's intake.
+  const sessionStart = useRef(Date.now());
   const pages = docs.reduce((a, d) => a + d.pages, 0);
 
-  const [ticks, setTicks] = useState(0);
-  const [syncing, setSyncing] = useState(false);
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      setSyncing(true);
-      setTicks((t) => t + 1);
-      window.setTimeout(() => setSyncing(false), 900);
-    }, 5000);
-    return () => window.clearInterval(id);
-  }, []);
-
-  const analyzedDocs = docs.filter((doc) => doc.analyzed && doc.processed);
-  const processedPages = analyzedDocs.reduce((total, doc) => total + doc.pages, 0);
-  const accuracy = analyzedDocs.length
+  const processedDocs = docs.filter((doc) => doc.analyzed && doc.processed);
+  const processedPages = processedDocs.reduce((total, doc) => total + doc.pages, 0);
+  const accuracy = processedDocs.length
     ? (
-        analyzedDocs.reduce(
+        processedDocs.reduce(
           (total, doc) => total + (doc.ocrConfidence + doc.translationQuality) / 2,
           0,
-        ) / analyzedDocs.length
+        ) / processedDocs.length
       ).toFixed(1)
     : "—";
 
@@ -66,7 +83,9 @@ export function DashboardView() {
     {
       label: "Record review confidence",
       value: accuracy === "—" ? accuracy : `${accuracy}%`,
-      hint: analyzedDocs.length ? "combined recognition and translation" : "no processed records",
+      hint: processedDocs.length
+        ? "combined recognition and translation"
+        : "no processed records",
       icon: Languages,
     },
     {
@@ -77,40 +96,92 @@ export function DashboardView() {
     },
   ];
 
+  // 1 — Intake trend: records added per day over the last 7 days, from real upload times.
+  const intakeTrend = useMemo(() => {
+    const today = new Date();
+    const buckets = new Map<string, number>();
+    for (let i = 6; i >= 0; i--) {
+      const day = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
+      buckets.set(day.toDateString(), 0);
+    }
+    docs.forEach((doc) => {
+      const key = new Date(doc.uploadedAt ?? sessionStart.current).toDateString();
+      if (buckets.has(key)) buckets.set(key, (buckets.get(key) ?? 0) + 1);
+    });
+    return Array.from(buckets.entries()).map(([key, count]) => ({
+      day: DAY_LABELS[new Date(key).getDay()],
+      records: count,
+    }));
+  }, [docs]);
+
+  // 2 — Document type distribution, from each record's classification.
+  const typeDistribution = useMemo(() => {
+    const counts = new Map<string, number>();
+    docs.forEach((doc) => {
+      const label = doc.classification ? TYPE_LABELS[doc.classification] ?? doc.classification : "Unclassified";
+      counts.set(label, (counts.get(label) ?? 0) + 1);
+    });
+    return Array.from(counts.entries()).map(([type, count]) => ({ type, count }));
+  }, [docs]);
+
+  // 3 — Comparison: processed records vs generated reports.
+  const comparison = useMemo(
+    () => [
+      { name: "Records processed", value: processedDocs.length, fill: "var(--color-chart-1)" },
+      { name: "Reports generated", value: reportsGenerated, fill: "var(--color-chart-2)" },
+    ],
+    [processedDocs.length, reportsGenerated],
+  );
+
+  // 4 — Processing status donut: complete vs in-progress vs queued.
+  const statusData = useMemo(() => {
+    let complete = 0;
+    let inProgress = 0;
+    let queued = 0;
+    docs.forEach((doc) => {
+      if (doc.analyzed && doc.processed) complete += 1;
+      else if (doc.analyzed || doc.processing) inProgress += 1;
+      else queued += 1;
+    });
+    return [
+      { name: "Complete", value: complete, fill: "var(--color-chart-2)" },
+      { name: "In progress", value: inProgress, fill: "var(--color-chart-3)" },
+      { name: "Queued", value: queued, fill: "var(--color-chart-1)" },
+    ].filter((s) => s.value > 0);
+  }, [docs]);
+
+  const statusTotal = docs.length;
+
   return (
     <div className="space-y-6">
       <section className="panel flex flex-wrap items-end justify-between gap-4 p-5">
         <div className="space-y-1">
           <p className="text-mono-xs uppercase tracking-widest text-muted-foreground">
-             Clinical overview
+            Clinical overview
           </p>
-           <h2 className="text-2xl font-semibold text-foreground">Patient records overview</h2>
+          <h2 className="text-2xl font-semibold text-foreground">Patient records overview</h2>
           <p className="max-w-2xl text-sm text-muted-foreground">
-             A clear view of current cases, record volumes, review status, and clinical risk.
+            A clear view of current cases, record volumes, review status, and clinical risk.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <span
-            className={cn(
-              "flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-mono-xs transition-colors",
-              syncing ? "bg-success/10 text-success" : "text-muted-foreground",
-            )}
-          >
-            <span
-              className={cn("size-2 rounded-full bg-success", syncing && "animate-ping")}
-            />
-             {syncing ? "Updating…" : "Records current"}
+          <span className="flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-mono-xs text-muted-foreground">
+            <span className="relative flex size-2">
+              <span className="absolute inline-flex size-2 animate-ping rounded-full bg-success opacity-70" />
+              <span className="relative inline-flex size-2 rounded-full bg-success" />
+            </span>
+            Records current · synced every 5s
           </span>
           <Button variant="outline" onClick={() => setView("intake")}>
-             <FileStack className="mr-2 size-4" /> Import records
+            <FileStack className="mr-2 size-4" /> Import records
           </Button>
           <Button onClick={() => setView("ocr")}>
-             <ScanSearch className="mr-2 size-4" /> Process records
+            <ScanSearch className="mr-2 size-4" /> Process records
           </Button>
         </div>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {metrics.map((m) => (
           <div key={m.label} className="panel space-y-3 p-4">
             <div className="flex items-center justify-between">
@@ -125,49 +196,29 @@ export function DashboardView() {
         ))}
       </section>
 
-
       <section className="grid gap-4 lg:grid-cols-2">
         <div className="panel p-5">
           <div className="mb-4 flex items-center justify-between">
             <div>
               <h3 className="font-serif text-lg text-foreground">Intake trend</h3>
-              <p className="text-mono-xs text-muted-foreground">weekly vs monthly document flow</p>
+              <p className="text-mono-xs text-muted-foreground">records added per day, last 7 days</p>
             </div>
             <TrendingUp className="size-4 text-navy" />
           </div>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={INTAKE_SERIES}>
+              <LineChart data={intakeTrend}>
                 <CartesianGrid stroke="var(--color-border)" vertical={false} />
-                <XAxis
-                  dataKey="period"
-                  stroke="var(--color-muted-foreground)"
-                  fontSize={11}
-                  tickLine={false}
-                />
-                <YAxis stroke="var(--color-muted-foreground)" fontSize={11} tickLine={false} />
-                <Tooltip
-                  contentStyle={{
-                    background: "var(--color-card)",
-                    border: "1px solid var(--color-border)",
-                    borderRadius: 8,
-                    fontSize: 12,
-                    color: "var(--color-foreground)",
-                  }}
-                />
+                <XAxis dataKey="day" stroke="var(--color-muted-foreground)" fontSize={11} tickLine={false} />
+                <YAxis allowDecimals={false} stroke="var(--color-muted-foreground)" fontSize={11} tickLine={false} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} />
                 <Line
                   type="monotone"
-                  dataKey="weekly"
+                  dataKey="records"
+                  name="records added"
                   stroke="var(--color-chart-1)"
                   strokeWidth={2}
-                  dot={false}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="monthly"
-                  stroke="var(--color-chart-2)"
-                  strokeWidth={2}
-                  dot={false}
+                  dot={{ r: 3, fill: "var(--color-chart-1)" }}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -178,61 +229,122 @@ export function DashboardView() {
           <div className="mb-4 flex items-center justify-between">
             <div>
               <h3 className="font-serif text-lg text-foreground">Document type distribution</h3>
-               <p className="text-mono-xs text-muted-foreground">records grouped by clinical type</p>
+              <p className="text-mono-xs text-muted-foreground">records grouped by clinical type</p>
             </div>
             <Languages className="size-4 text-navy" />
           </div>
+          {typeDistribution.length === 0 ? (
+            <ChartEmpty message="No records imported yet." />
+          ) : (
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={typeDistribution}>
+                  <CartesianGrid stroke="var(--color-border)" vertical={false} />
+                  <XAxis dataKey="type" stroke="var(--color-muted-foreground)" fontSize={10} tickLine={false} />
+                  <YAxis allowDecimals={false} stroke="var(--color-muted-foreground)" fontSize={11} tickLine={false} />
+                  <Tooltip contentStyle={TOOLTIP_STYLE} />
+                  <Bar dataKey="count" name="records" fill="var(--color-chart-1)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+
+        <div className="panel p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h3 className="font-serif text-lg text-foreground">Intake processed vs reports</h3>
+              <p className="text-mono-xs text-muted-foreground">processed records against generated reports</p>
+            </div>
+            <GitMerge className="size-4 text-navy" />
+          </div>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={DOC_TYPE_DISTRIBUTION}>
+              <BarChart data={comparison}>
                 <CartesianGrid stroke="var(--color-border)" vertical={false} />
-                <XAxis
-                  dataKey="type"
-                  stroke="var(--color-muted-foreground)"
-                  fontSize={10}
-                  tickLine={false}
-                />
-                <YAxis stroke="var(--color-muted-foreground)" fontSize={11} tickLine={false} />
-                <Tooltip
-                  contentStyle={{
-                    background: "var(--color-card)",
-                    border: "1px solid var(--color-border)",
-                    borderRadius: 8,
-                    fontSize: 12,
-                    color: "var(--color-foreground)",
-                  }}
-                />
-                <Bar dataKey="count" fill="var(--color-chart-1)" radius={[4, 4, 0, 0]} />
+                <XAxis dataKey="name" stroke="var(--color-muted-foreground)" fontSize={11} tickLine={false} />
+                <YAxis allowDecimals={false} stroke="var(--color-muted-foreground)" fontSize={11} tickLine={false} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} />
+                <Bar dataKey="value" name="count" radius={[4, 4, 0, 0]}>
+                  {comparison.map((entry) => (
+                    <Cell key={entry.name} fill={entry.fill} />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
+        </div>
+
+        <div className="panel p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h3 className="font-serif text-lg text-foreground">Processing status</h3>
+              <p className="text-mono-xs text-muted-foreground">complete, in progress, and queued records</p>
+            </div>
+            <Clock3 className="size-4 text-navy" />
+          </div>
+          {statusTotal === 0 ? (
+            <ChartEmpty message="No records in this session yet." />
+          ) : (
+            <div className="flex h-64 items-center justify-center gap-6">
+              <div className="relative h-56 w-56 shrink-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={statusData}
+                      dataKey="value"
+                      nameKey="name"
+                      innerRadius="58%"
+                      outerRadius="88%"
+                      paddingAngle={2}
+                      stroke="var(--color-card)"
+                    >
+                      {statusData.map((entry) => (
+                        <Cell key={entry.name} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={TOOLTIP_STYLE} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                  <p className="font-serif text-2xl leading-none text-foreground">{statusTotal}</p>
+                  <p className="text-mono-xs text-muted-foreground">records</p>
+                </div>
+              </div>
+              <ul className="space-y-2 text-sm">
+                {statusData.map((s) => (
+                  <li key={s.name} className="flex items-center gap-2">
+                    <span className="size-2.5 rounded-full" style={{ background: s.fill }} />
+                    <span className="text-foreground">{s.name}</span>
+                    <span className="text-mono-xs text-muted-foreground">{s.value}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       </section>
 
       <section className="panel p-5">
         <div className="mb-3 flex items-center gap-2">
           <Activity className="size-4 text-navy" />
-           <h3 className="font-serif text-lg text-foreground">Review progress</h3>
+          <h3 className="font-serif text-lg text-foreground">Review progress</h3>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {[
-            { step: "Step 1", label: "Document intake", done: docs.length > 0 },
-             { step: "Step 2", label: "Processing & translation", done: useReadiness("ocr") },
-             { step: "Step 3", label: "Clinical summary & timeline", done: useReadiness("synthesis") },
-            { step: "Step 4", label: "Evaluation report", done: useReadiness("report") },
+            { step: "Step 1", label: "Document intake", done: docs.length > 0, icon: FileStack },
+            { step: "Step 2", label: "Processing & translation", done: ocrComplete, icon: ScanSearch },
+            { step: "Step 3", label: "Clinical summary & timeline", done: Boolean(synthesis), icon: GitMerge },
+            { step: "Step 4", label: "Evaluation report", done: reportReady, icon: CheckCircle2 },
           ].map((s) => (
-            <div
-              key={s.step}
-              className="rounded-md border border-border bg-surface px-3 py-3 text-sm"
-            >
-              <p className="text-mono-xs uppercase tracking-widest text-muted-foreground">
-                {s.step}
-              </p>
+            <div key={s.step} className="rounded-md border border-border bg-surface px-3 py-3 text-sm">
+              <p className="text-mono-xs uppercase tracking-widest text-muted-foreground">{s.step}</p>
               <p className="mt-1 text-foreground">{s.label}</p>
               <p
-                className={
-                  s.done ? "mt-1 text-mono-xs text-success" : "mt-1 text-mono-xs text-warning"
-                }
+                className={cn(
+                  "mt-1 text-mono-xs",
+                  s.done ? "text-success" : "text-warning",
+                )}
               >
                 {s.done ? "complete" : "pending"}
               </p>
@@ -244,9 +356,10 @@ export function DashboardView() {
   );
 }
 
-function useReadiness(key: "ocr" | "synthesis" | "report") {
-  const { ocrComplete, synthesis, reportReady } = useClinicalStore();
-  if (key === "ocr") return ocrComplete;
-  if (key === "synthesis") return Boolean(synthesis);
-  return reportReady;
+function ChartEmpty({ message }: { message: string }) {
+  return (
+    <div className="flex h-64 items-center justify-center">
+      <p className="text-sm text-muted-foreground">{message}</p>
+    </div>
+  );
 }

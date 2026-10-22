@@ -39,6 +39,10 @@
   --color-ring: var(--ring);
   --color-terminal: var(--terminal);
   --color-terminal-foreground: var(--terminal-foreground);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -92,6 +96,10 @@
   --sidebar-accent-foreground: oklch(0.97 0.008 85);
   --sidebar-border: oklch(0.31 0.045 262);
   --sidebar-ring: oklch(0.55 0.09 258);
+  --chart-1: oklch(0.32 0.075 245);
+  --chart-2: oklch(0.55 0.1 168);
+  --chart-3: oklch(0.78 0.155 71);
+  --chart-4: oklch(0.577 0.225 27);
 }
 
 @layer base {
