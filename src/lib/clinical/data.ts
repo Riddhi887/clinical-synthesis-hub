@@ -297,16 +297,3 @@ export const SYNTHESIS_BASE: Omit<Synthesis, "caseId" | "createdAt"> = {
   risk: "ACTION REQUIRED",
 };
 
-export const SYNTHESIS_BASE: Omit<Synthesis, "caseId" | "createdAt"> = {
-
-export const TELEMETRY_SCRIPT = (doc: ClinicalDoc): string[] => [
-  `[pytesseract / easyocr] Rasterizing PDF pages (1240x1753px) — ${doc.name}`,
-  `[easyocr] Loading ${doc.language} glyph recogniser + detector weights (CRAFT)...`,
-  `[layoutlm_v3] Segmenting page layout: ${doc.pages} page(s), 14 text blocks, 2 table regions`,
-  `[clinical_ner_model] Scanning medical entity bounding boxes...`,
-  `[auto_classify] Identified document as '${doc.classification}' - confidence ${doc.classifierConfidence}%`,
-  `[huggingface_marianmt] Translating regional medical notes to English via MarianMT/FB-BART API...`,
-  `[medical_ner:Clinical-AI-Apollo] Extracted entities → DRUG(4) DOSAGE(4) DIAGNOSIS(3) DATE(6)`,
-  `[confidence_evaluator] Raw OCR Confidence: ${doc.ocrConfidence}% | Neural Translation Quality: ${doc.translationQuality}%`,
-  `[persistence] Committed artefact row → asset_slot(raw_documents) uuid constraint OK`,
-];
