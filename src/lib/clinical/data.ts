@@ -297,23 +297,7 @@ export const SYNTHESIS_BASE: Omit<Synthesis, "caseId" | "createdAt"> = {
   risk: "ACTION REQUIRED",
 };
 
-export const DOC_TYPE_DISTRIBUTION = [
-  { type: "Prescriptions", count: 412 },
-  { type: "Discharge", count: 286 },
-  { type: "Lab Results", count: 508 },
-  { type: "Imaging", count: 197 },
-  { type: "Surgical", count: 134 },
-];
-
-export const INTAKE_SERIES = [
-  { period: "W-06", weekly: 118, monthly: 402 },
-  { period: "W-05", weekly: 146, monthly: 448 },
-  { period: "W-04", weekly: 132, monthly: 476 },
-  { period: "W-03", weekly: 178, monthly: 512 },
-  { period: "W-02", weekly: 204, monthly: 588 },
-  { period: "W-01", weekly: 231, monthly: 641 },
-  { period: "Now", weekly: 258, monthly: 703 },
-];
+export const SYNTHESIS_BASE: Omit<Synthesis, "caseId" | "createdAt"> = {
 
 export const TELEMETRY_SCRIPT = (doc: ClinicalDoc): string[] => [
   `[pytesseract / easyocr] Rasterizing PDF pages (1240x1753px) — ${doc.name}`,
