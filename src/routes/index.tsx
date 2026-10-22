@@ -36,15 +36,6 @@ function Index() {
 
 function AppContent() {
   const { user, view, hydrated } = useClinicalStore();
-  const [lastSync, setLastSync] = useState("--:--:--");
-
-  useEffect(() => {
-    const tick = () =>
-      setLastSync(new Date().toLocaleTimeString("en-GB", { hour12: false }));
-    tick();
-    const id = window.setInterval(tick, 5000);
-    return () => window.clearInterval(id);
-  }, []);
 
   if (!hydrated) {
     return (
@@ -57,7 +48,7 @@ function AppContent() {
   if (!user) return <AuthScreen />;
 
   return (
-    <AppShell lastSync={lastSync}>
+    <AppShell>
       {view === "dashboard" && <DashboardView />}
       {view === "intake" && <IntakeView />}
       {view === "ocr" && <OcrView />}
