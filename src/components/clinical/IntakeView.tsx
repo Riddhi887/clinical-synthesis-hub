@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { useClinicalStore } from "@/lib/clinical/store";
 
 export function IntakeView() {
-  const { docs, addFiles, loadSampleCase, removeDoc, clearIntake, setView } = useClinicalStore();
+  const { docs, addFiles, loadSampleCase, removeDoc, clearIntake, setView, batchActive, queuedDocIds } = useClinicalStore();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
@@ -22,9 +22,16 @@ export function IntakeView() {
         sourceFile: file,
       })),
     );
-    toast.success(`${n} document(s) staged`, {
-      description: "Records are staged. Open Process & Translation to retrieve and translate them.",
-    });
+    if (batchActive) {
+      toast.info(`${n} document(s) queued`, {
+        description:
+          "A batch is currently processing. These records will be handled automatically when it finishes.",
+      });
+    } else {
+      toast.success(`${n} document(s) staged`, {
+        description: "Records are staged. Open Process & Translation to retrieve and translate them.",
+      });
+    }
   };
 
   const pages = docs.reduce((a, d) => a + d.pages, 0);
@@ -97,6 +104,7 @@ export function IntakeView() {
            <h3 className="font-serif text-lg text-foreground">Records ready for review</h3>
             <p className="text-mono-xs text-muted-foreground">
               {docs.length} document(s) · {pages ? `${pages} page(s) analyzed` : "pages analyzed in Process & Translation"} · {sizeMb} MB
+              {batchActive && queuedDocIds.length > 0 ? ` · ${queuedDocIds.length} queued` : ""}
             </p>
           </div>
           {docs.length > 0 && (
@@ -127,7 +135,13 @@ export function IntakeView() {
                     Record ID {d.id} · staged for processing · {d.sizeKb} KB
                   </p>
                 </div>
-                <Badge variant="secondary" className="text-mono-xs">Ready to process</Badge>
+                {queuedDocIds.includes(d.id) ? (
+                  <Badge variant="secondary" className="text-mono-xs text-warning">
+                    Queued
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary" className="text-mono-xs">Ready to process</Badge>
+                )}
                 <span className="text-mono-xs text-muted-foreground">
                    {d.sizeKb} KB
                 </span>

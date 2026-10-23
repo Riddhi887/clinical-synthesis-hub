@@ -5,6 +5,7 @@ import {
   BarChart3,
   FileStack,
   FileText,
+  FolderOpen,
   GitMerge,
   LogOut,
   PanelLeftClose,
@@ -26,6 +27,7 @@ import { cn } from "@/lib/utils";
 import { useClinicalStore, type ViewKey } from "@/lib/clinical/store";
 const MAIN: { key: ViewKey; label: string; icon: typeof BarChart3 }[] = [
   { key: "dashboard", label: "Overview", icon: BarChart3 },
+  { key: "patient", label: "Patient Cases", icon: FolderOpen },
 ];
 
 const PIPELINE: { key: ViewKey; label: string; step: string; icon: typeof FileStack }[] = [

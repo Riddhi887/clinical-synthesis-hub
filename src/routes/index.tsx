@@ -4,6 +4,7 @@ import { AppShell } from "@/components/clinical/AppShell";
 import { AuthScreen } from "@/components/clinical/AuthScreen";
 import { DashboardView } from "@/components/clinical/DashboardView";
 import { IntakeView } from "@/components/clinical/IntakeView";
+import { PatientView } from "@/components/clinical/PatientView";
 import { OcrView } from "@/components/clinical/OcrView";
 import { ReportView } from "@/components/clinical/ReportView";
 import { SynthesisView } from "@/components/clinical/SynthesisView";
@@ -50,6 +51,7 @@ function AppContent() {
   return (
     <AppShell>
       {view === "dashboard" && <DashboardView />}
+      {view === "patient" && <PatientView />}
       {view === "intake" && <IntakeView />}
       {view === "ocr" && <OcrView />}
       {view === "synthesis" && <SynthesisView />}
