@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Languages, Play, ScanSearch } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +9,10 @@ import { useClinicalStore } from "@/lib/clinical/store";
 
 
 export function OcrView() {
-  const { docs, ocrComplete, updateDoc, markOcrComplete, setView } = useClinicalStore();
+  const { docs, ocrComplete, updateDoc, markOcrComplete, setView, beginBatch, endBatch, takeQueued } = useClinicalStore();
+  const docsRef = useRef(docs);
+  docsRef.current = docs;
+  const runningRef = useRef(false);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState(ocrComplete ? 100 : 0);
   const [active, setActive] = useState<string | null>(null);
@@ -25,15 +28,12 @@ export function OcrView() {
     return () => window.clearInterval(id);
   }, [running]);
 
-  const run = async () => {
-    if (!docs.length || running) return;
-    setRunning(true);
-    setProgress(0);
-    setStatus("Retrieving the text");
-    const total = docs.length;
+  const processIds = async (ids: string[]) => {
     let failed = 0;
+    const total = ids.length;
     for (let i = 0; i < total; i++) {
-      const doc = docs[i]!;
+      const doc = docsRef.current.find((d) => d.id === ids[i]);
+      if (!doc) continue;
       setActive(doc.name);
       setProgress(5);
       setStatus("Retrieving the text");
@@ -97,11 +97,33 @@ export function OcrView() {
         setStatus("Retrieving the text");
       }
     }
-    setActive(null);
+    return failed;
+  };
+
+  const run = async () => {
+    if (!docsRef.current.length || runningRef.current) return;
+    runningRef.current = true;
+    setRunning(true);
+    setProgress(0);
+    setStatus("Retrieving the text");
+    // Isolated batch: uploads arriving while this runs join the queue, never this stream.
+    beginBatch();
+    let failed = await processIds(docsRef.current.map((d) => d.id));
+    // Sequentially auto-process records queued while the batch was running.
+    for (;;) {
+      const next = takeQueued();
+      if (!next.length) break;
+      setStatus("Processing queued records");
+      failed += await processIds(next);
+    }
+    endBatch();
     markOcrComplete();
+    runningRef.current = false;
     setRunning(false);
+    setActive(null);
+    const total = docsRef.current.length;
     setStatus(failed ? "Some records need to be processed again" : "All records processed");
-    setSelected((s) => s ?? docs[0]!.id);
+    setSelected((s) => s ?? docsRef.current[0]?.id ?? null);
     if (failed) {
       toast.error("Some records could not be processed", {
         description: `${failed} of ${total} record(s) failed retrieval or analysis. No fallback text was used.`,
