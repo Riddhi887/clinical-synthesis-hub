@@ -145,10 +145,9 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
         const parsed = JSON.parse(raw) as Partial<PersistedState>;
         // File handles cannot be persisted; drop stale entries so reprocessing behaves cleanly.
         const cleanDocs = (list: ClinicalDoc[]) =>
-          list.map((doc) => ({
-            ...doc,
-            sourceFile: doc.sourceFile instanceof File ? doc.sourceFile : undefined,
-          }));
+          list.map(({ sourceFile, ...doc }) =>
+            sourceFile instanceof File ? ({ ...doc, sourceFile } as ClinicalDoc) : (doc as ClinicalDoc),
+          );
         setState({
           ...initialState,
           ...parsed,
@@ -260,9 +259,8 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
         patch({ docs: [], logs: [], ocrComplete: false, synthesis: null, reportReady: false }),
       appendLog: (line) => {
         const ts = new Date().toLocaleTimeString("en-GB", { hour12: false });
-        const entry = `[${ts}] ${line}`;
+        // Processing telemetry stays in the developer console only; the UI remains clean.
         console.info(`[clinical-pipeline ${ts}] ${line}`);
-        setState((s) => ({ ...s, logs: [...s.logs.slice(-99), entry] }));
       },
       finishOcr: (docs) => patch({ docs, ocrComplete: true }),
       markOcrComplete: () =>
