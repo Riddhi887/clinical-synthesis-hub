@@ -71,9 +71,12 @@ export function PatientView() {
                 </div>
                 <Badge
                   variant="secondary"
-                  className={cn("text-mono-xs", f.risk === "STABLE" ? "text-success" : "text-warning")}
+                  className={cn(
+                    "text-mono-xs",
+                    (f.synthesis?.risk ?? "STABLE") === "STABLE" ? "text-success" : "text-warning",
+                  )}
                 >
-                  {f.risk === "STABLE" ? "Stable" : "Action required"}
+                  {(f.synthesis?.risk ?? "STABLE") === "STABLE" ? "Stable" : "Action required"}
                 </Badge>
                 <Button size="sm" variant="outline" onClick={() => openCase(f.caseId)}>
                   View patient folder
