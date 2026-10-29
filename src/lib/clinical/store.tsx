@@ -285,14 +285,26 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
           }));
           const combinedText = cleanedDocs.map(({ text }) => text).join("\n");
           const firstDoc = processedDocs[0];
-          const patientName = firstDoc?.patientName ?? firstDoc?.fields?.["patient_name"] ?? "Patient not identified";
+          const patientName =
+            firstDoc?.patientName ??
+            firstDoc?.fields?.["patient_name"] ??
+            extractPatientName(combinedText) ??
+            "Patient not identified";
           const ageMatch = combinedText.match(/\bage\s*[:|\-]?\s*(\d{1,3})\s*(?:years?|yrs?)?/i);
           const sexMatch = combinedText.match(/\b(?:sex|gender)\s*[:|\-]?\s*([^|\n]+)/i);
           const physicians = Array.from(
             new Set(
-              processedDocs
-                .map((doc) => doc.fields?.["doctor"])
-                .filter((doctor): doctor is string => Boolean(doctor)),
+              [
+                ...processedDocs.map((doc) => doc.fields?.["doctor"]),
+                ...Array.from(
+                  combinedText.matchAll(
+                    /(?:operating surgeon|surgeon|physician|consultant|doctor|reviewed by)\s*[:\-]\s*([^\n|]+)/gi,
+                  ),
+                ).map((match) => match[1]),
+              ]
+                .filter((doctor): doctor is string => Boolean(doctor))
+                .map((doctor) => doctor.replace(/\s*[,.\-–]\s*$/, "").trim())
+                .filter((doctor) => doctor.length > 3),
             ),
           );
           const diagnoses = extractSynthesisItems(
@@ -315,11 +327,11 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
               patientName,
               age: ageMatch ? Number(ageMatch[1]) : 0,
               sex: sexMatch?.[1]?.trim() ?? "Not specified",
-              mrn: firstDoc?.fields?.["mrn"] ?? "Not specified",
+              mrn: firstDoc?.fields?.["mrn"] ?? extractMrn(combinedText) ?? "Not specified",
               physicians,
               diagnoses: diagnoses.map((label, index) => ({ code: `DOC-${index + 1}`, label })),
               medications,
-              vitals: [],
+              vitals: extractVitals(combinedText),
               timeline,
               gaps,
               risk: gaps.length ? "ACTION REQUIRED" : "STABLE",
@@ -505,4 +517,52 @@ function detectGaps(docs: ClinicalDoc[], text: string): string[] {
     gaps.push("No clinical date was found in the translated records.");
   }
   return gaps.length ? gaps : ["No missing section was detected from the translated records."];
+}
+
+function extractPatientName(text: string): string | null {
+  const match = text.match(/\bPatient(?:'s name| name)?\s*[:\-]\s*([^\n|/]+)/i);
+  const name = match?.[1]?.trim();
+  return name && name.length > 2 ? name : null;
+}
+
+function extractMrn(text: string): string | null {
+  const match = text.match(/\bMRN\b\s*(?:No\.?|number)?\s*[:\-]?\s*([A-Za-z0-9][A-Za-z0-9\-]*)/i);
+  if (!match) return null;
+  return /^MRN/i.test(match[1]) ? match[1] : `MRN-${match[1]}`;
+}
+
+function extractVitals(text: string): Synthesis["vitals"] {
+  const defs: { key: RegExp; grade: (value: number) => "normal" | "watch" | "high" }[] = [
+    { key: /fasting (?:blood )?glucose/i, grade: (v) => (v >= 140 ? "high" : v >= 110 ? "watch" : "normal") },
+    { key: /hba1c/i, grade: (v) => (v >= 7 ? "high" : v >= 6.5 ? "watch" : "normal") },
+    { key: /ldl cholesterol/i, grade: (v) => (v >= 160 ? "high" : v >= 130 ? "watch" : "normal") },
+    { key: /serum creatinine/i, grade: (v) => (v >= 1.5 ? "high" : v >= 1.2 ? "watch" : "normal") },
+    { key: /haemoglobin|hemoglobin/i, grade: (v) => (v < 10 ? "high" : v <= 13.5 ? "watch" : "normal") },
+    { key: /blood pressure/i, grade: (v) => (v >= 140 ? "high" : v >= 130 ? "watch" : "normal") },
+  ];
+  const vitals: Synthesis["vitals"] = [];
+  const usedDefs = new Set<(typeof defs)[number]>();
+  for (const line of text.split("\n")) {
+    const cleaned = line.replace(/^\s*[|•\-\d.)]+\s*/, "").trim();
+    const colonIndex = cleaned.indexOf(":");
+    if (colonIndex <= 0) continue;
+    const label = cleaned.slice(0, colonIndex).trim();
+    const def = defs.find((candidate) => !usedDefs.has(candidate) && candidate.key.test(label));
+    if (!def) continue;
+    const note = cleaned.match(/\(([^)]+)\)/)?.[1] ?? "";
+    const value = cleaned.slice(colonIndex + 1).split("(")[0].trim();
+    const number = Number(value.match(/\d+(?:\.\d+)?/)?.[0] ?? NaN);
+    if (!value || !Number.isFinite(number)) continue;
+    usedDefs.add(def);
+    const status: "normal" | "watch" | "high" = /poor|elevated|high|abnormal|alta|deranged|raised/i.test(note)
+      ? "high"
+      : /upper limit|borderline|slightly|watch|monitor/i.test(note)
+        ? "watch"
+        : /normal|stable|satisfactory|within/i.test(note)
+          ? "normal"
+          : def.grade(number);
+    vitals.push({ label, trend: "→ latest", value, status });
+    if (vitals.length >= 8) break;
+  }
+  return vitals;
 }
