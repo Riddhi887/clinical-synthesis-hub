@@ -527,8 +527,9 @@ function extractPatientName(text: string): string | null {
 
 function extractMrn(text: string): string | null {
   const match = text.match(/\bMRN\b\s*(?:No\.?|number)?\s*[:\-]?\s*([A-Za-z0-9][A-Za-z0-9\-]*)/i);
-  if (!match) return null;
-  return /^MRN/i.test(match[1]) ? match[1] : `MRN-${match[1]}`;
+  const id = match?.[1];
+  if (!id) return null;
+  return /^MRN/i.test(id) ? id : `MRN-${id}`;
 }
 
 function extractVitals(text: string): Synthesis["vitals"] {
@@ -550,7 +551,7 @@ function extractVitals(text: string): Synthesis["vitals"] {
     const def = defs.find((candidate) => !usedDefs.has(candidate) && candidate.key.test(label));
     if (!def) continue;
     const note = cleaned.match(/\(([^)]+)\)/)?.[1] ?? "";
-    const value = cleaned.slice(colonIndex + 1).split("(")[0].trim();
+    const value = cleaned.slice(colonIndex + 1).split("(")[0]?.trim() ?? "";
     const number = Number(value.match(/\d+(?:\.\d+)?/)?.[0] ?? NaN);
     if (!value || !Number.isFinite(number)) continue;
     usedDefs.add(def);
