@@ -9,9 +9,7 @@ import { useClinicalStore } from "@/lib/clinical/store";
 
 
 export function OcrView() {
-  const { docs, ocrComplete, updateDoc, markOcrComplete, setView, beginBatch, endBatch, takeQueued } = useClinicalStore();
-  const docsRef = useRef(docs);
-  docsRef.current = docs;
+  const { docs, ocrComplete, updateDoc, markOcrComplete, setView, beginBatch, endBatch, takeQueued, getDocs } = useClinicalStore();
   const runningRef = useRef(false);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState(ocrComplete ? 100 : 0);
@@ -32,7 +30,8 @@ export function OcrView() {
     let failed = 0;
     const total = ids.length;
     for (let i = 0; i < total; i++) {
-      const doc = docsRef.current.find((d) => d.id === ids[i]);
+      // Read the live store so documents queued after this loop started are found too.
+      const doc = getDocs().find((d) => d.id === ids[i]);
       if (!doc) continue;
       setActive(doc.name);
       setProgress(5);
