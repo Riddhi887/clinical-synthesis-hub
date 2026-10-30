@@ -1,0 +1,10 @@
+node_modules
+.git
+.gitignore
+.vscode
+.DS_Store
+npm-debug.log*
+.output
+Dockerfile*
+!Dockerfile.frontend
+!backend/Dockerfile
