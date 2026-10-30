@@ -81,6 +81,78 @@ const initialState: PersistedState = {
   sidebarCollapsed: false,
 };
 
+/** Per-user workspace archive: what a signed-out reviewer keeps (records, summaries, reports, KPIs). */
+const WORKSPACE_ARCHIVE_PREFIX = "chss.workspace.v1:";
+
+interface WorkspaceSnapshot {
+  docs: ClinicalDoc[];
+  ocrComplete: boolean;
+  synthesis: Synthesis | null;
+  reportReady: boolean;
+  cases: CaseAsset[];
+  folders: Record<string, PatientFolder>;
+  reportsGenerated: number;
+}
+
+const emptyWorkspaceSnapshot = (): WorkspaceSnapshot => ({
+  docs: [],
+  ocrComplete: false,
+  synthesis: null,
+  reportReady: false,
+  cases: [],
+  folders: {},
+  reportsGenerated: 0,
+});
+
+function stripFileHandles(list: ClinicalDoc[]): ClinicalDoc[] {
+  return list.map(({ sourceFile: _sourceFile, ...doc }) => doc);
+}
+
+function readWorkspaceArchive(email: string): WorkspaceSnapshot {
+  try {
+    const raw = window.localStorage.getItem(`${WORKSPACE_ARCHIVE_PREFIX}${email.toLowerCase()}`);
+    if (!raw) return emptyWorkspaceSnapshot();
+    const parsed = JSON.parse(raw) as Partial<WorkspaceSnapshot>;
+    return {
+      docs: stripFileHandles(parsed.docs ?? []),
+      ocrComplete: parsed.ocrComplete ?? false,
+      synthesis: parsed.synthesis ?? null,
+      reportReady: parsed.reportReady ?? false,
+      cases: parsed.cases ?? [],
+      folders: Object.fromEntries(
+        Object.entries(parsed.folders ?? {}).map(([id, folder]) => [
+          id,
+          { ...folder, docs: stripFileHandles(folder.docs) },
+        ]),
+      ),
+      reportsGenerated: parsed.reportsGenerated ?? 0,
+    };
+  } catch {
+    // Deterministic fallback: a corrupt archive is ignored and sign-in starts clean.
+    return emptyWorkspaceSnapshot();
+  }
+}
+
+function writeWorkspaceArchive(email: string, s: PersistedState) {
+  try {
+    const archive: WorkspaceSnapshot = {
+      docs: s.docs,
+      ocrComplete: s.ocrComplete,
+      synthesis: s.synthesis,
+      reportReady: s.reportReady,
+      cases: s.cases,
+      folders: s.folders,
+      reportsGenerated: s.reportsGenerated,
+    };
+    window.localStorage.setItem(
+      `${WORKSPACE_ARCHIVE_PREFIX}${email.toLowerCase()}`,
+      JSON.stringify(archive),
+    );
+  } catch {
+    /* storage unavailable — archive skipped, session ends in memory */
+  }
+}
+
 /** Simulated PostgreSQL/Supabase uuid primary key generation (client-side). */
 export function newUuid() {
   const seg = () => Math.floor(Math.random() * 0xffff).toString(16).padStart(4, "0");
@@ -93,6 +165,8 @@ export function newCaseId() {
 
 interface StoreValue extends PersistedState {
   hydrated: boolean;
+  /** Latest documents straight from the store, even after this view unmounts (queue draining). */
+  getDocs: () => ClinicalDoc[];
   login: (email: string) => void;
   logout: () => void;
   setView: (v: ViewKey) => void;
@@ -183,15 +257,22 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
     return {
       ...state,
       hydrated,
-      login: (email) => patch({ user: email, view: "dashboard" }),
-      logout: () => {
-        setState({ ...initialState });
-        try {
-          window.localStorage.removeItem(STORAGE_KEY);
-        } catch {
-          /* noop */
-        }
-      },
+      getDocs: () => stateRef.current.docs,
+      login: (email) =>
+        setState((s) => ({
+          ...initialState,
+          user: email,
+          view: "dashboard",
+          sidebarCollapsed: s.sidebarCollapsed,
+          // Returning reviewers get their archived records, summaries, reports and KPIs back.
+          ...readWorkspaceArchive(email),
+        })),
+      logout: () =>
+        setState((s) => {
+          // Archive the workspace under the reviewer's email so KPIs survive sign-out.
+          if (s.user) writeWorkspaceArchive(s.user, s);
+          return { ...initialState, sidebarCollapsed: s.sidebarCollapsed };
+        }),
       setView: (view) => patch({ view }),
       addFiles: (files) => {
         const created: ClinicalDoc[] = files.map((f) => {

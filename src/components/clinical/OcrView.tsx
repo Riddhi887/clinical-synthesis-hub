@@ -9,9 +9,7 @@ import { useClinicalStore } from "@/lib/clinical/store";
 
 
 export function OcrView() {
-  const { docs, ocrComplete, updateDoc, markOcrComplete, setView, beginBatch, endBatch, takeQueued } = useClinicalStore();
-  const docsRef = useRef(docs);
-  docsRef.current = docs;
+  const { docs, ocrComplete, updateDoc, markOcrComplete, setView, beginBatch, endBatch, takeQueued, getDocs, batchActive } = useClinicalStore();
   const runningRef = useRef(false);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState(ocrComplete ? 100 : 0);
@@ -32,7 +30,8 @@ export function OcrView() {
     let failed = 0;
     const total = ids.length;
     for (let i = 0; i < total; i++) {
-      const doc = docsRef.current.find((d) => d.id === ids[i]);
+      // Read the live store so documents queued after this loop started are found too.
+      const doc = getDocs().find((d) => d.id === ids[i]);
       if (!doc) continue;
       setActive(doc.name);
       setProgress(5);
@@ -101,14 +100,15 @@ export function OcrView() {
   };
 
   const run = async () => {
-    if (!docsRef.current.length || runningRef.current) return;
+    // batchActive also covers a queue drain still running from another mount of this view.
+    if (!getDocs().length || runningRef.current || batchActive) return;
     runningRef.current = true;
     setRunning(true);
     setProgress(0);
     setStatus("Retrieving the text");
     // Isolated batch: uploads arriving while this runs join the queue, never this stream.
     beginBatch();
-    let failed = await processIds(docsRef.current.map((d) => d.id));
+    let failed = await processIds(getDocs().map((d) => d.id));
     // Sequentially auto-process records queued while the batch was running.
     for (;;) {
       const next = takeQueued();
@@ -121,9 +121,9 @@ export function OcrView() {
     runningRef.current = false;
     setRunning(false);
     setActive(null);
-    const total = docsRef.current.length;
+    const total = getDocs().length;
     setStatus(failed ? "Some records need to be processed again" : "All records processed");
-    setSelected((s) => s ?? docsRef.current[0]?.id ?? null);
+    setSelected((s) => s ?? getDocs()[0]?.id ?? null);
     if (failed) {
       toast.error("Some records could not be processed", {
         description: `${failed} of ${total} record(s) failed retrieval or analysis. No fallback text was used.`,
