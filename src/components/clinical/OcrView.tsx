@@ -9,7 +9,7 @@ import { useClinicalStore } from "@/lib/clinical/store";
 
 
 export function OcrView() {
-  const { docs, ocrComplete, updateDoc, markOcrComplete, setView, beginBatch, endBatch, takeQueued, getDocs } = useClinicalStore();
+  const { docs, ocrComplete, updateDoc, markOcrComplete, setView, beginBatch, endBatch, takeQueued, getDocs, batchActive } = useClinicalStore();
   const runningRef = useRef(false);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState(ocrComplete ? 100 : 0);
@@ -100,7 +100,8 @@ export function OcrView() {
   };
 
   const run = async () => {
-    if (!getDocs().length || runningRef.current) return;
+    // batchActive also covers a queue drain still running from another mount of this view.
+    if (!getDocs().length || runningRef.current || batchActive) return;
     runningRef.current = true;
     setRunning(true);
     setProgress(0);
