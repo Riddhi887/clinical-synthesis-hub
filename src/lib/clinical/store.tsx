@@ -165,6 +165,8 @@ export function newCaseId() {
 
 interface StoreValue extends PersistedState {
   hydrated: boolean;
+  /** Latest documents straight from the store, even after this view unmounts (queue draining). */
+  getDocs: () => ClinicalDoc[];
   login: (email: string) => void;
   logout: () => void;
   setView: (v: ViewKey) => void;
@@ -255,6 +257,7 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
     return {
       ...state,
       hydrated,
+      getDocs: () => stateRef.current.docs,
       login: (email) =>
         setState((s) => ({
           ...initialState,
