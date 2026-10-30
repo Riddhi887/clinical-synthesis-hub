@@ -152,6 +152,8 @@ function writeWorkspaceArchive(email: string, s: PersistedState) {
     /* storage unavailable — archive skipped, session ends in memory */
   }
 }
+
+/** Simulated PostgreSQL/Supabase uuid primary key generation (client-side). */
 export function newUuid() {
   const seg = () => Math.floor(Math.random() * 0xffff).toString(16).padStart(4, "0");
   return `${seg()}${seg()}-${seg()}-${seg()}-${seg()}-${seg()}${seg()}${seg()}`;
@@ -253,15 +255,21 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
     return {
       ...state,
       hydrated,
-      login: (email) => patch({ user: email, view: "dashboard" }),
-      logout: () => {
-        setState({ ...initialState });
-        try {
-          window.localStorage.removeItem(STORAGE_KEY);
-        } catch {
-          /* noop */
-        }
-      },
+      login: (email) =>
+        setState((s) => ({
+          ...initialState,
+          user: email,
+          view: "dashboard",
+          sidebarCollapsed: s.sidebarCollapsed,
+          // Returning reviewers get their archived records, summaries, reports and KPIs back.
+          ...readWorkspaceArchive(email),
+        })),
+      logout: () =>
+        setState((s) => {
+          // Archive the workspace under the reviewer's email so KPIs survive sign-out.
+          if (s.user) writeWorkspaceArchive(s.user, s);
+          return { ...initialState, sidebarCollapsed: s.sidebarCollapsed };
+        }),
       setView: (view) => patch({ view }),
       addFiles: (files) => {
         const created: ClinicalDoc[] = files.map((f) => {
