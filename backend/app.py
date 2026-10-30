@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import os
 import re
+<<<<<<< HEAD
 import shutil
+=======
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -11,7 +14,11 @@ import filetype
 import httpx
 import numpy as np
 import pytesseract
+<<<<<<< HEAD
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+=======
+from fastapi import FastAPI, File, HTTPException, UploadFile
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
 from fastapi.middleware.cors import CORSMiddleware
 from langdetect import detect
 from PIL import Image, ImageOps
@@ -31,6 +38,7 @@ app.add_middleware(
 ocr_engine = RapidOCR()
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.1:8b")
+<<<<<<< HEAD
 OCR_TIMEOUT_SECONDS = int(os.environ.get("OCR_TIMEOUT_SECONDS", "60"))
 OLLAMA_TIMEOUT_SECONDS = float(os.environ.get("OLLAMA_TIMEOUT_SECONDS", "120"))
 
@@ -56,6 +64,8 @@ try:
         print("[pipeline] tesseract-language-check | tam,tel available", flush=True)
 except Exception as exc:
     print(f"[pipeline] tesseract-language-check-failed | error={exc}", flush=True)
+=======
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
 
 
 def detect_document_type(filename: str, kind: str | None = None) -> dict[str, Any]:
@@ -162,7 +172,11 @@ def choose_text(embedded: str, ocr: str) -> str:
     )
 
 
+<<<<<<< HEAD
 def tesseract_text(image: Image.Image, source_text: str = "", filename: str = "", case_id: str | None = None, document_id: str | None = None) -> str:
+=======
+def tesseract_text(image: Image.Image, source_text: str = "") -> str:
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
     grayscale = ImageOps.autocontrast(ImageOps.grayscale(image))
     variants = [image, grayscale, grayscale.point(lambda value: 0 if value < 180 else 255)]
     detected_scripts = script_counts(source_text)
@@ -175,6 +189,7 @@ def tesseract_text(image: Image.Image, source_text: str = "", filename: str = ""
     else:
         languages = "eng+hin+tam+tel+spa"
     outputs = []
+<<<<<<< HEAD
     errors: list[str] = []
     for variant in variants:
         for psm in (6, 11):
@@ -200,6 +215,24 @@ def tesseract_text(image: Image.Image, source_text: str = "", filename: str = ""
 
 def best_ocr_text(rapid_text: str, image: Image.Image, filename: str = "", case_id: str | None = None, document_id: str | None = None) -> str:
     tesseract = tesseract_text(image, rapid_text, filename, case_id, document_id)
+=======
+    for variant in variants:
+        for psm in (6, 11):
+            outputs.append(
+                normalize_text(
+                    pytesseract.image_to_string(
+                        variant,
+                        lang=languages,
+                        config=f"--psm {psm}",
+                    )
+                )
+            )
+    return max(outputs, key=ocr_candidate_score, default="")
+
+
+def best_ocr_text(rapid_text: str, image: Image.Image) -> str:
+    tesseract = tesseract_text(image, rapid_text)
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
     return min(
         (normalize_text(rapid_text), normalize_text(tesseract)),
         key=lambda value: (noise_score(value), -ocr_candidate_score(value)[0]),
@@ -256,6 +289,7 @@ def extract_fields(text: str) -> dict[str, Any]:
     return fields
 
 
+<<<<<<< HEAD
 def extract_medications(text: str) -> list[dict[str, str]]:
     medications: list[dict[str, str]] = []
     lines = [line.strip() for line in text.splitlines() if line.strip()]
@@ -343,6 +377,8 @@ def extract_medications(text: str) -> list[dict[str, str]]:
     return medications
 
 
+=======
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
 def ocr_image_from_array(image_array: np.ndarray) -> str:
     result, _ = ocr_engine(image_array)
     if not result:
@@ -355,6 +391,7 @@ def ocr_image_from_array(image_array: np.ndarray) -> str:
     return normalize_text("\n".join(texts))
 
 
+<<<<<<< HEAD
 def ocr_image(path: str, filename: str, case_id: str | None = None, document_id: str | None = None) -> str:
     pipeline_log("page-start", filename, case_id, document_id, "page=1/1 stage=ocr-started")
     image = Image.open(path)
@@ -364,6 +401,17 @@ def ocr_image(path: str, filename: str, case_id: str | None = None, document_id:
 
 
 def ocr_pdf(path: str, filename: str, case_id: str | None = None, document_id: str | None = None) -> tuple[str, int]:
+=======
+def ocr_image(path: str, filename: str) -> str:
+    print(f"[rasterize] {filename} page 1/1 -> OCR started", flush=True)
+    image = Image.open(path)
+    text = best_ocr_text(ocr_image_from_array(np.array(image)), image)
+    print(f"[rasterize] {filename} page 1/1 -> OCR complete ({len(text)} chars)", flush=True)
+    return text
+
+
+def ocr_pdf(path: str, filename: str) -> tuple[str, int]:
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
     reader = PdfReader(path)
     pages: list[str] = []
     total_pages = len(reader.pages)
@@ -371,7 +419,11 @@ def ocr_pdf(path: str, filename: str, case_id: str | None = None, document_id: s
 
     rendered_doc = None
     for page_number, page in enumerate(reader.pages, start=1):
+<<<<<<< HEAD
         pipeline_log("page-start", filename, case_id, document_id, f"page={page_number}/{total_pages} stage=retrieving-text")
+=======
+        print(f"[rasterize] {filename} page {page_number}/{total_pages} -> retrieving text", flush=True)
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
         try:
             page_image = page.extract_text() or ""
             if page_image.strip():
@@ -385,6 +437,7 @@ def ocr_pdf(path: str, filename: str, case_id: str | None = None, document_id: s
         try:
             if rendered_doc is None:
                 rendered_doc = fitz.open(path)
+<<<<<<< HEAD
             pipeline_log("page-stage", filename, case_id, document_id, f"page={page_number}/{total_pages} stage=rasterizing target=1240x1753")
             pix = rendered_doc[page_number - 1].get_pixmap(matrix=fitz.Matrix(2.5, 2.5), alpha=False)
             image = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
@@ -396,6 +449,19 @@ def ocr_pdf(path: str, filename: str, case_id: str | None = None, document_id: s
         except Exception as exc:
             pipeline_log("page-failed", filename, case_id, document_id, f"page={page_number}/{total_pages} error={exc}")
             raise RuntimeError(f"OCR failed on page {page_number}/{total_pages}: {exc}") from exc
+=======
+            print(f"[rasterize] {filename} page {page_number}/{total_pages} -> rasterizing 1240x1753 target", flush=True)
+            pix = rendered_doc[page_number - 1].get_pixmap(matrix=fitz.Matrix(2.5, 2.5), alpha=False)
+            image = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+            raster_text = best_ocr_text(ocr_image_from_array(np.array(image)), image)
+            text = choose_text(embedded_text, raster_text)
+            pages.append(text)
+            source = "embedded/OCR selected"
+            print(f"[rasterize] {filename} page {page_number}/{total_pages} -> {source} ({len(text)} chars)", flush=True)
+        except Exception:
+            pages.append("")
+            print(f"[rasterize] {filename} page {page_number}/{total_pages} -> OCR failed", flush=True)
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
 
     if rendered_doc is not None:
         rendered_doc.close()
@@ -418,7 +484,11 @@ def get_language_label(text: str) -> str:
 def call_ollama(prompt: str, model: str = OLLAMA_MODEL) -> str:
     url = f"{OLLAMA_HOST.rstrip('/')}/api/generate"
     payload = {"model": model, "prompt": prompt, "stream": False}
+<<<<<<< HEAD
     response = httpx.post(url, json=payload, timeout=OLLAMA_TIMEOUT_SECONDS)
+=======
+    response = httpx.post(url, json=payload, timeout=120.0)
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
     response.raise_for_status()
     data = response.json()
     return str(data.get("response", ""))
@@ -472,12 +542,21 @@ def translate_text(text: str, source_lang: str) -> str:
     try:
         output = call_ollama(prompt)
     except Exception as exc:
+<<<<<<< HEAD
         raise HTTPException(status_code=503, detail=f"Translation service unavailable for detected language {source_lang}; no fallback translation was used") from exc
     if not output.strip():
         raise HTTPException(status_code=503, detail=f"Translation service returned no text for detected language {source_lang}; no fallback translation was used")
     translated = clean_model_output(output)
     if not translated:
         raise HTTPException(status_code=503, detail=f"Translation returned no clean English text for detected language {source_lang}; no fallback translation was used")
+=======
+        raise HTTPException(status_code=503, detail="Translation service unavailable; no fallback translation was used") from exc
+    if not output.strip():
+        raise HTTPException(status_code=503, detail="Translation service returned no text; no fallback translation was used")
+    translated = clean_model_output(output)
+    if not translated:
+        raise HTTPException(status_code=503, detail="Translation service returned no clean English text; no fallback translation was used")
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
     if has_non_english_script(translated):
         retry_prompt = (
             "Rewrite the following clinical translation in English only. Do not output Hindi, Tamil, Telugu, "
@@ -488,9 +567,15 @@ def translate_text(text: str, source_lang: str) -> str:
         try:
             translated = clean_model_output(call_ollama(retry_prompt))
         except Exception as exc:
+<<<<<<< HEAD
             raise HTTPException(status_code=503, detail=f"English translation validation failed for detected language {source_lang}; no non-English fallback was used") from exc
     if has_non_english_script(translated):
         raise HTTPException(status_code=503, detail=f"Translation for detected language {source_lang} was not English; no non-English fallback was used")
+=======
+            raise HTTPException(status_code=503, detail="English translation validation failed; no non-English fallback was used") from exc
+    if has_non_english_script(translated):
+        raise HTTPException(status_code=503, detail="Translation was not English; no non-English fallback was used")
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
     return translated
 
 
@@ -515,11 +600,15 @@ def healthcheck() -> dict[str, str]:
 
 
 @app.post("/process-document")
+<<<<<<< HEAD
 async def process_document(
     file: UploadFile = File(...),
     case_id: str | None = Form(None),
     document_id: str | None = Form(None),
 ) -> dict[str, Any]:
+=======
+async def process_document(file: UploadFile = File(...)) -> dict[str, Any]:
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
     if not file.filename:
         raise HTTPException(status_code=400, detail="No filename supplied")
 
@@ -529,6 +618,7 @@ async def process_document(
         temp_path = tmp.name
 
     try:
+<<<<<<< HEAD
         pipeline_log("document-start", file.filename, case_id, document_id, "stage=request-received")
         safe_case_id = re.sub(r"[^A-Za-z0-9_-]", "", case_id) if case_id else None
         if safe_case_id and file.filename:
@@ -554,11 +644,22 @@ async def process_document(
         except RuntimeError as exc:
             pipeline_log("document-failed", file.filename, case_id, document_id, f"stage=ocr error={exc}")
             raise HTTPException(status_code=422, detail=f"OCR failed for {file.filename}: {exc}") from exc
+=======
+        mime = detect_file_kind(temp_path)
+        if mime == "application/pdf":
+            extracted_text, page_count = ocr_pdf(temp_path, file.filename)
+        elif mime.startswith("image/"):
+            extracted_text = ocr_image(temp_path, file.filename)
+            page_count = 1
+        else:
+            extracted_text = ""
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
 
         if not extracted_text.strip():
             raise HTTPException(status_code=422, detail="No readable text found in uploaded document")
 
         ocr_confidence = estimate_confidence(extracted_text)
+<<<<<<< HEAD
         pipeline_log("document-stage", file.filename, case_id, document_id, f"stage=ocr-complete pages={page_count} confidence={ocr_confidence}%")
         pipeline_log("document-stage", file.filename, case_id, document_id, "stage=ocr-cleanup-started")
         cleaned_text = extracted_text if is_reliable_text(extracted_text) else clean_ocr_text(extracted_text)
@@ -575,6 +676,26 @@ async def process_document(
         text_classification = classify_document_from_text(translated_text)
         translation_quality = estimate_confidence(translated_text)
         pipeline_log("document-complete", file.filename, case_id, document_id, f"classification={text_classification['classification']} confidence={text_classification['confidence'] * 100:.1f}% patient={patient_name or 'not found'}")
+=======
+        print(
+            f"[analysis] {file.filename} -> OCR confidence {ocr_confidence}% | language detection started",
+            flush=True,
+        )
+        cleaned_text = extracted_text if is_reliable_text(extracted_text) else clean_ocr_text(extracted_text)
+        source_lang = get_language_label(cleaned_text)
+        translated_text = translate_text(cleaned_text, source_lang)
+        fields = extract_fields(cleaned_text)
+        translated_fields = extract_fields(translated_text)
+        patient_name = translated_fields.get("patient_name") or fields.get("patient_name")
+
+        text_classification = classify_document_from_text(translated_text)
+        translation_quality = estimate_confidence(translated_text)
+        print(
+            f"[analysis] {file.filename} -> {text_classification['classification']} "
+            f"({text_classification['confidence'] * 100:.1f}%) | translated to English | patient={patient_name or 'not found'}",
+            flush=True,
+        )
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
 
         return {
             "filename": file.filename,
@@ -588,6 +709,7 @@ async def process_document(
             "ocr_text": cleaned_text,
             "translated_text": translated_text,
             "patient_name": patient_name,
+<<<<<<< HEAD
             "medications": medications,
             "fields": {**fields, **translated_fields, "medications": medications},
             "status": "processed",
@@ -597,10 +719,19 @@ async def process_document(
         raise
     except Exception as exc:
         pipeline_log("document-failed", file.filename, case_id, document_id, f"status=500 error={exc}")
+=======
+            "fields": {**fields, **translated_fields},
+            "status": "processed",
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
         raise HTTPException(status_code=500, detail=f"Processing failed: {str(exc)}") from exc
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
+<<<<<<< HEAD
 
 
 @app.delete("/cases/{case_id}")
@@ -667,3 +798,5 @@ def delete_case_record(case_id: str, filename: str) -> dict[str, str]:
         raise HTTPException(status_code=404, detail="Case record not found")
     record_path.unlink()
     return {"status": "deleted", "case_id": safe_id, "filename": safe_name}
+=======
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba

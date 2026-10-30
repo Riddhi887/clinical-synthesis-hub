@@ -11,7 +11,10 @@ import {
 import {
   SAMPLE_CASE,
   type ClinicalDoc,
+<<<<<<< HEAD
   type MedicationRecord,
+=======
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
   type Synthesis,
 } from "./data";
 
@@ -33,12 +36,15 @@ export interface CaseAsset {
   hasReport: boolean;
 }
 
+<<<<<<< HEAD
 export interface QueuedBatch {
   caseId: string;
   docIds: string[];
   createdAt: number;
 }
 
+=======
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
 /** A patient-scoped folder: every asset here belongs to exactly one case id. */
 export interface PatientFolder {
   caseId: string;
@@ -63,12 +69,17 @@ interface PersistedState {
   activeCaseId: string | null;
   reportsGenerated: number;
   /** Documents staged while a processing batch is running; processed after it finishes. */
+<<<<<<< HEAD
   queuedBatches: QueuedBatch[];
   batchActive: boolean;
   processingCaseId: string | null;
   processingDocName: string | null;
   processingProgress: number;
   processingStatus: string;
+=======
+  queuedDocIds: string[];
+  batchActive: boolean;
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
   sidebarCollapsed: boolean;
 }
 
@@ -87,12 +98,17 @@ const initialState: PersistedState = {
   folders: {},
   activeCaseId: null,
   reportsGenerated: 0,
+<<<<<<< HEAD
   queuedBatches: [],
   batchActive: false,
   processingCaseId: null,
   processingDocName: null,
   processingProgress: 0,
   processingStatus: "Waiting to process records",
+=======
+  queuedDocIds: [],
+  batchActive: false,
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
   sidebarCollapsed: false,
 };
 
@@ -204,6 +220,7 @@ interface StoreValue extends PersistedState {
   clearIntake: () => void;
   appendLog: (line: string) => void;
   finishOcr: (docs: ClinicalDoc[]) => void;
+<<<<<<< HEAD
   markOcrComplete: (caseId?: string) => void;
   buildSynthesis: (caseId?: string) => Synthesis;
   markReportReady: () => void;
@@ -212,11 +229,22 @@ interface StoreValue extends PersistedState {
   takeQueued: () => QueuedBatch | null;
   assignDocsToCase: (docIds: string[], caseId: string) => void;
   setProcessingState: (changes: Partial<Pick<PersistedState, "processingCaseId" | "processingDocName" | "processingProgress" | "processingStatus">>) => void;
+=======
+  markOcrComplete: () => void;
+  buildSynthesis: () => Synthesis;
+  markReportReady: () => void;
+  beginBatch: () => void;
+  endBatch: () => void;
+  takeQueued: () => string[];
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
   toggleSidebar: () => void;
   openCase: (caseId: string) => void;
   closeCase: () => void;
   startNewCase: () => void;
+<<<<<<< HEAD
   deleteCase: (caseId: string) => Promise<boolean>;
+=======
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
 }
 
 const StoreContext = createContext<StoreValue | null>(null);
@@ -293,14 +321,20 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
         }),
       setView: (view) => patch({ view }),
       addFiles: (files) => {
+<<<<<<< HEAD
         const importCaseId = stateRef.current.view === "intake" || stateRef.current.batchActive
           ? newCaseId()
           : undefined;
+=======
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
         const created: ClinicalDoc[] = files.map((f) => {
           return {
             id: newUuid(),
             name: f.name,
+<<<<<<< HEAD
             ...(importCaseId ? { caseId: importCaseId } : {}),
+=======
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
             origin: "upload",
             processing: true,
             analyzed: false,
@@ -319,18 +353,28 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
           };
         });
         setState((s) => {
+<<<<<<< HEAD
           const openFolder = s.view === "patient" && s.activeCaseId
             ? s.folders[s.activeCaseId]
             : undefined;
+=======
+          const openFolder = s.activeCaseId ? s.folders[s.activeCaseId] : undefined;
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
           return {
             ...s,
             docs: [...s.docs, ...created],
             // While a batch is processing, new files join the isolated queue instead
             // of the active batch stream.
+<<<<<<< HEAD
             queuedBatches: s.batchActive && importCaseId
               ? [...s.queuedBatches, { caseId: importCaseId, docIds: created.map((d) => d.id), createdAt: Date.now() }]
               : s.queuedBatches,
             activeCaseId: !s.batchActive && importCaseId ? importCaseId : s.activeCaseId,
+=======
+            queuedDocIds: s.batchActive
+              ? [...s.queuedDocIds, ...created.map((d) => d.id)]
+              : s.queuedDocIds,
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
             ocrComplete: false,
             reportReady: false,
             // Uploads made inside an open patient folder stay bound to that folder.
@@ -357,6 +401,7 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
           processed: false,
           uploadedAt: Date.now(),
         }));
+<<<<<<< HEAD
         patch({ docs: created, activeCaseId: null, ocrComplete: false, reportReady: false, synthesis: null, logs: [], queuedBatches: [], batchActive: false });
       },
       removeDoc: (id) =>
@@ -369,12 +414,21 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
         })),
       clearIntake: () =>
         patch({ docs: [], logs: [], ocrComplete: false, synthesis: null, reportReady: false, queuedBatches: [] }),
+=======
+        patch({ docs: created, activeCaseId: null, ocrComplete: false, reportReady: false, synthesis: null, logs: [], queuedDocIds: [], batchActive: false });
+      },
+      removeDoc: (id) =>
+        patch((s) => ({ docs: s.docs.filter((d) => d.id !== id), reportReady: false })),
+      clearIntake: () =>
+        patch({ docs: [], logs: [], ocrComplete: false, synthesis: null, reportReady: false }),
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
       appendLog: (line) => {
         const ts = new Date().toLocaleTimeString("en-GB", { hour12: false });
         // Processing telemetry stays in the developer console only; the UI remains clean.
         console.info(`[clinical-pipeline ${ts}] ${line}`);
       },
       finishOcr: (docs) => patch({ docs, ocrComplete: true }),
+<<<<<<< HEAD
       markOcrComplete: (caseId) =>
         patch((s) => {
           const targetDocs = caseId ? s.docs.filter((doc) => doc.caseId === caseId) : s.docs;
@@ -395,6 +449,23 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
           const caseDocs = targetCaseId ? s.docs.filter((doc) => doc.caseId === targetCaseId) : s.docs;
           const processedDocs = s.docs.filter(
             (doc) => caseDocs.includes(doc) && doc.processed && doc.translatedText.trim(),
+=======
+      markOcrComplete: () =>
+        patch((s) => {
+          const complete = s.docs.length > 0 && s.docs.every(
+            (doc) => doc.analyzed && doc.originalText.trim() && doc.translatedText.trim(),
+          );
+          return {
+            docs: s.docs.map((doc) => ({ ...doc, processed: complete && Boolean(doc.analyzed), processing: false })),
+            ocrComplete: complete,
+          };
+        }),
+      buildSynthesis: () => {
+        let result!: Synthesis;
+        setState((s) => {
+          const processedDocs = s.docs.filter(
+            (doc) => doc.processed && doc.translatedText.trim(),
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
           );
           const cleanedDocs = processedDocs.map((doc) => ({
             doc,
@@ -428,9 +499,13 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
             combinedText,
             /(?:pre-operative diagnosis|post-operative diagnosis|diagnosis|diagnoses|impression)\s*[:\-]?\s*([^\n]+)/gi,
           );
+<<<<<<< HEAD
           const extractedMedications = extractMedicationItems(combinedText);
           const structuredMedications = processedDocs.flatMap((doc) => doc.medications ?? []);
           const medications = mergeMedicationItems(structuredMedications, extractedMedications);
+=======
+          const medications = extractMedicationItems(combinedText);
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
           const timeline = cleanedDocs.map(({ doc, text }, index) => ({
             id: `uploaded-${index + 1}`,
             date: extractDate(text),
@@ -441,7 +516,11 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
           }));
           const gaps = detectGaps(processedDocs, combinedText);
           // Reuse the open folder's case so repeated synthesis keeps one patient folder.
+<<<<<<< HEAD
           const resolvedCaseId = targetCaseId ?? newCaseId();
+=======
+          const caseId = s.activeCaseId ?? newCaseId();
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
           const synthesis: Synthesis = {
               patientName,
               age: ageMatch ? Number(ageMatch[1]) : 0,
@@ -454,7 +533,11 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
               timeline,
               gaps,
               risk: gaps.length ? "ACTION REQUIRED" : "STABLE",
+<<<<<<< HEAD
               caseId: resolvedCaseId,
+=======
+              caseId,
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
               createdAt: Date.now(),
             } satisfies Synthesis;
           result = synthesis;
@@ -463,7 +546,11 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
             caseId: synthesis.caseId,
             patientName: synthesis.patientName,
             createdAt: synthesis.createdAt,
+<<<<<<< HEAD
             docCount: caseDocs.length,
+=======
+            docCount: s.docs.length,
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
             pages,
             risk: synthesis.risk,
             hasReport: s.reportReady,
@@ -471,6 +558,7 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
           const cases = s.cases.some((c) => c.caseId === asset.caseId)
             ? s.cases.map((c) => (c.caseId === asset.caseId ? asset : c))
             : [asset, ...s.cases];
+<<<<<<< HEAD
           const existingFolder = s.folders[resolvedCaseId];
           const folder: PatientFolder = existingFolder
             ? { ...existingFolder, docs: caseDocs, synthesis, reportReady: s.reportReady }
@@ -480,6 +568,17 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
                 mrn: synthesis.mrn,
                 createdAt: synthesis.createdAt,
                 docs: caseDocs,
+=======
+          const existingFolder = s.folders[caseId];
+          const folder: PatientFolder = existingFolder
+            ? { ...existingFolder, docs: s.docs, synthesis, reportReady: s.reportReady }
+            : {
+                caseId,
+                patientName: synthesis.patientName,
+                mrn: synthesis.mrn,
+                createdAt: synthesis.createdAt,
+                docs: s.docs,
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
                 synthesis,
                 reportReady: s.reportReady,
               };
@@ -487,8 +586,13 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
             ...s,
             synthesis,
             cases,
+<<<<<<< HEAD
             activeCaseId: resolvedCaseId,
             folders: { ...s.folders, [resolvedCaseId]: folder },
+=======
+            activeCaseId: caseId,
+            folders: { ...s.folders, [caseId]: folder },
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
           };
         });
         return result;
@@ -510,6 +614,7 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
       beginBatch: () => patch({ batchActive: true }),
       endBatch: () => patch({ batchActive: false }),
       takeQueued: () => {
+<<<<<<< HEAD
         const batch = stateRef.current.queuedBatches[0] ?? null;
         if (batch) setState((s) => ({ ...s, queuedBatches: s.queuedBatches.slice(1) }));
         return batch;
@@ -520,6 +625,12 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
           docs: s.docs.map((doc) => docIds.includes(doc.id) ? { ...doc, caseId } : doc),
         })),
       setProcessingState: (changes) => patch(changes),
+=======
+        const ids = stateRef.current.queuedDocIds;
+        setState((s) => ({ ...s, queuedDocIds: [] }));
+        return ids;
+      },
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
       toggleSidebar: () => patch((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
       openCase: (caseId) => {
         const folder = stateRef.current.folders[caseId];
@@ -536,7 +647,11 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
             folder.docs.every(
               (d) => d.analyzed && d.originalText.trim() && d.translatedText.trim(),
             ),
+<<<<<<< HEAD
           queuedBatches: [],
+=======
+          queuedDocIds: [],
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
           batchActive: false,
         }));
       },
@@ -549,6 +664,7 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
           ocrComplete: false,
           synthesis: null,
           reportReady: false,
+<<<<<<< HEAD
           queuedBatches: [],
           batchActive: false,
           view: "intake",
@@ -615,6 +731,12 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
 
         return true;
       },
+=======
+          queuedDocIds: [],
+          batchActive: false,
+          view: "intake",
+        }),
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
     };
   }, [state, hydrated, patch]);
 
@@ -654,6 +776,7 @@ function cleanTranslatedRecord(text: string): string {
 }
 
 function extractMedicationItems(text: string): Synthesis["medications"] {
+<<<<<<< HEAD
   if (!text || !text.trim()) return [];
 
   const nonDrugTerms = /\b(?:bilirubin|creatinine|blood urea|urea|bun|glucose|fasting glucose|plasma glucose|hba1c|cholesterol|ldl|hdl|triglycerides|haemoglobin|hemoglobin|platelet|platelets|sodium|potassium|wbc|rbc|calcium|troponin|sgot|sgpt|bilirubin|alkaline|blood pressure|pulse|spo2|heart rate|respiratory rate|ct ratio|cardiomegaly|effusion|infiltrate|consolidation|stent|angioplasty|catheterisation|ecg|x-ray|radiograph)\b/i;
@@ -859,6 +982,19 @@ function mergeMedicationItems(
     if (!existing.timesPerDay && medication.timesPerDay) existing.timesPerDay = medication.timesPerDay;
   }
   return merged;
+=======
+  const lines = text.split("\n").map((line) => line.replace(/^\s*[|•\-\d.)]+\s*/, "").trim());
+  return lines
+    .filter((line) => /\b(?:tablet|tab\.?|capsule|mg|dose|antibiotic|analgesic|metformin|amlodipine|paracetamol|pantoprazole|drotaverine|rabeprazole|domperidone)\b/i.test(line))
+    .map((line) => {
+      const dosage = line.match(/\b(?:\d+(?:\.\d+)?\s*(?:mg|g|mcg|ml)|\d+\s*(?:tablet|tablets|capsule|capsules))\b/i)?.[0] ?? "Not stated";
+      const frequency = line.match(/\b(?:once|twice|three times|daily|weekly|nightly|as needed|every\s+\d+\s+hours?)\b[^.,;|]*/i)?.[0]?.trim() ?? "Not stated";
+      const name = line.split(/\s+(?:\d+(?:\.\d+)?\s*(?:mg|g|mcg|ml)|\d+\s*(?:tablet|tablets|capsule|capsules))\b/i)[0]?.replace(/^(?:tab\.?|tablet|capsule)\s+/i, "").trim() ?? line;
+      return { name, dosage, frequency, since: "Not specified" };
+    })
+    .filter((item, index, values) => item.name.length > 2 && values.findIndex((value) => value.name.toLowerCase() === item.name.toLowerCase()) === index)
+    .slice(0, 20);
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
 }
 
 function extractDate(text: string): string {

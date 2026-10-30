@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import { useEffect, useRef, useState } from "react";
+=======
+import { useRef } from "react";
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
 import { toast } from "sonner";
 import {
   ArrowLeft,
@@ -10,7 +14,10 @@ import {
   FolderPlus,
   Languages,
   Plus,
+<<<<<<< HEAD
   Trash2,
+=======
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
   UserRound,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -24,7 +31,11 @@ const formatDate = (ts?: number) =>
     : "—";
 
 export function PatientView() {
+<<<<<<< HEAD
   const { folders, activeCaseId, openCase, closeCase, startNewCase, deleteCase } = useClinicalStore();
+=======
+  const { folders, activeCaseId, openCase, closeCase, startNewCase } = useClinicalStore();
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
   const folder = activeCaseId ? folders[activeCaseId] : undefined;
 
   if (folder) return <PatientHub folder={folder} onClose={closeCase} />;
@@ -79,6 +90,7 @@ export function PatientView() {
                 >
                   {(f.synthesis?.risk ?? "STABLE") === "STABLE" ? "Stable" : "Action required"}
                 </Badge>
+<<<<<<< HEAD
                 <div className="flex items-center gap-1.5">
                   <Button size="sm" variant="outline" onClick={() => openCase(f.caseId)}>
                     View patient folder
@@ -112,6 +124,11 @@ export function PatientView() {
                     <Trash2 className="size-4" />
                   </Button>
                 </div>
+=======
+                <Button size="sm" variant="outline" onClick={() => openCase(f.caseId)}>
+                  View patient folder
+                </Button>
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
               </li>
             ))}
           </ul>
@@ -122,6 +139,7 @@ export function PatientView() {
 }
 
 function PatientHub({ folder, onClose }: { folder: PatientFolder; onClose: () => void }) {
+<<<<<<< HEAD
   const { addFiles, setView, deleteCase } = useClinicalStore();
   const inputRef = useRef<HTMLInputElement>(null);
   const reportInputRef = useRef<HTMLInputElement>(null);
@@ -182,6 +200,10 @@ function PatientHub({ folder, onClose }: { folder: PatientFolder; onClose: () =>
       setFilesBusy(false);
     }
   };
+=======
+  const { addFiles, setView } = useClinicalStore();
+  const inputRef = useRef<HTMLInputElement>(null);
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
 
   const ingest = (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -235,6 +257,7 @@ function PatientHub({ folder, onClose }: { folder: PatientFolder; onClose: () =>
                 e.target.value = "";
               }}
             />
+<<<<<<< HEAD
             <input
               ref={reportInputRef}
               type="file"
@@ -277,6 +300,12 @@ function PatientHub({ folder, onClose }: { folder: PatientFolder; onClose: () =>
             >
               <Trash2 className="mr-1.5 size-4" /> Delete case
             </Button>
+=======
+            <Button variant="outline" onClick={() => inputRef.current?.click()}>
+              <Plus className="mr-2 size-4" /> Add documents
+            </Button>
+            <Button onClick={() => setView("ocr")}>Open record workflow</Button>
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
           </div>
         </div>
       </section>
@@ -376,6 +405,7 @@ function PatientHub({ folder, onClose }: { folder: PatientFolder; onClose: () =>
           )}
         </Slot>
       </section>
+<<<<<<< HEAD
 
       <section className="panel overflow-hidden">
         <header className="flex items-center gap-2 border-b border-border px-4 py-3">
@@ -409,6 +439,8 @@ function PatientHub({ folder, onClose }: { folder: PatientFolder; onClose: () =>
           </ul>
         )}
       </section>
+=======
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
     </div>
   );
 }

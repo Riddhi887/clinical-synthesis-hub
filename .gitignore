@@ -16,6 +16,7 @@ dist-ssr
 .nitro
 *.local
 
+<<<<<<< HEAD
 # Environment and local secrets
 .env
 .env.*
@@ -35,6 +36,8 @@ htmlcov/
 # Uploaded patient records and generated backend storage
 backend/records/
 
+=======
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars

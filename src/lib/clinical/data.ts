@@ -6,6 +6,7 @@ export type DocClass =
   | "Diagnostic Imaging Report"
   | "Unclassified Clinical Document";
 
+<<<<<<< HEAD
 export interface MedicationRecord {
   name: string;
   dosage: string;
@@ -20,12 +21,20 @@ export interface ClinicalDoc {
   id: string;
   name: string;
   caseId?: string;
+=======
+export interface ClinicalDoc {
+  id: string;
+  name: string;
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
   origin?: "sample" | "upload";
   /** When the record entered this session; powers the dashboard intake trend. */
   uploadedAt?: number;
   patientName?: string;
   fields?: Record<string, string>;
+<<<<<<< HEAD
   medications?: MedicationRecord[];
+=======
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
   processing?: boolean;
   analyzed?: boolean;
   sourceFile?: File;
@@ -58,7 +67,11 @@ export interface Synthesis {
   mrn: string;
   physicians: string[];
   diagnoses: { code: string; label: string }[];
+<<<<<<< HEAD
   medications: MedicationRecord[];
+=======
+  medications: { name: string; dosage: string; frequency: string; since: string }[];
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
   vitals: { label: string; trend: string; value: string; status: "normal" | "watch" | "high" }[];
   timeline: TimelineEvent[];
   gaps: string[];
@@ -234,6 +247,7 @@ export const SYNTHESIS_BASE: Omit<Synthesis, "caseId" | "createdAt"> = {
     { code: "I51.7", label: "Cardiomegaly" },
   ],
   medications: [
+<<<<<<< HEAD
     {
       name: "Metformin",
       dosage: "500 mg",
@@ -270,6 +284,12 @@ export const SYNTHESIS_BASE: Omit<Synthesis, "caseId" | "createdAt"> = {
       instructions: "With breakfast",
       timesPerDay: "1 per day",
     },
+=======
+    { name: "Metformin", dosage: "500 mg", frequency: "Twice daily, post-meal", since: "Aug 2023" },
+    { name: "Atorvastatin", dosage: "20 mg", frequency: "Once nightly", since: "Aug 2023" },
+    { name: "Aspirin", dosage: "75 mg", frequency: "Once daily", since: "Aug 2023" },
+    { name: "Clopidogrel", dosage: "75 mg", frequency: "Once daily (12 months post-stent)", since: "Aug 2023" },
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
   ],
   vitals: [
     { label: "Fasting glucose", trend: "▲ rising", value: "168 mg/dL", status: "high" },

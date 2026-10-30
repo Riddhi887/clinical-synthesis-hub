@@ -44,7 +44,10 @@ export function AppShell({ children }: { children: ReactNode }) {
     user,
     logout,
     docs,
+<<<<<<< HEAD
     batchActive,
+=======
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
     ocrComplete,
     synthesis,
     reportReady,
@@ -53,12 +56,21 @@ export function AppShell({ children }: { children: ReactNode }) {
   } = useClinicalStore();
   const collapsed = sidebarCollapsed;
 
+<<<<<<< HEAD
   const workingFor = (key: ViewKey) => {
     if (key === "intake") return docs.some((doc) => !doc.caseId);
     if (key === "ocr") return batchActive;
     if (key === "synthesis") return view === "synthesis" && ocrComplete && !synthesis;
     if (key === "report") return view === "report" && Boolean(synthesis) && !reportReady;
     return false;
+=======
+  const badgeFor = (key: ViewKey) => {
+    if (key === "intake" && docs.length) return String(docs.length);
+    if (key === "ocr" && ocrComplete) return "✓";
+    if (key === "synthesis" && synthesis) return "✓";
+    if (key === "report" && reportReady) return "✓";
+    return null;
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
   };
 
   return (
@@ -130,7 +142,11 @@ export function AppShell({ children }: { children: ReactNode }) {
                   icon={<item.icon className="size-4" />}
                   label={item.label}
                   hint={item.step}
+<<<<<<< HEAD
                   working={workingFor(item.key)}
+=======
+                  badge={badgeFor(item.key)}
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
                   collapsed={collapsed}
                 />
               ))}
@@ -259,7 +275,11 @@ function NavButton({
   icon,
   label,
   hint,
+<<<<<<< HEAD
   working,
+=======
+  badge,
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
   collapsed,
 }: {
   active: boolean;
@@ -267,7 +287,11 @@ function NavButton({
   icon: ReactNode;
   label: string;
   hint?: string;
+<<<<<<< HEAD
   working?: boolean;
+=======
+  badge?: string | null;
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
   collapsed?: boolean;
 }) {
   return (
@@ -298,6 +322,7 @@ function NavButton({
           <span className="block truncate">{label}</span>
         </span>
       )}
+<<<<<<< HEAD
       {working && (
         <span
           className="relative flex size-2 shrink-0"
@@ -306,6 +331,11 @@ function NavButton({
         >
           <span className="absolute inline-flex size-2 animate-ping rounded-full bg-success opacity-70" />
           <span className="relative inline-flex size-2 rounded-full bg-success" />
+=======
+      {badge && !collapsed && (
+        <span className="rounded-full bg-success/20 px-1.5 py-0.5 text-[0.62rem] text-success">
+          {badge}
+>>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
         </span>
       )}
     </button>
