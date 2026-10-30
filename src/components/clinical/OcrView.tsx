@@ -100,14 +100,14 @@ export function OcrView() {
   };
 
   const run = async () => {
-    if (!docsRef.current.length || runningRef.current) return;
+    if (!getDocs().length || runningRef.current) return;
     runningRef.current = true;
     setRunning(true);
     setProgress(0);
     setStatus("Retrieving the text");
     // Isolated batch: uploads arriving while this runs join the queue, never this stream.
     beginBatch();
-    let failed = await processIds(docsRef.current.map((d) => d.id));
+    let failed = await processIds(getDocs().map((d) => d.id));
     // Sequentially auto-process records queued while the batch was running.
     for (;;) {
       const next = takeQueued();
@@ -120,9 +120,9 @@ export function OcrView() {
     runningRef.current = false;
     setRunning(false);
     setActive(null);
-    const total = docsRef.current.length;
+    const total = getDocs().length;
     setStatus(failed ? "Some records need to be processed again" : "All records processed");
-    setSelected((s) => s ?? docsRef.current[0]?.id ?? null);
+    setSelected((s) => s ?? getDocs()[0]?.id ?? null);
     if (failed) {
       toast.error("Some records could not be processed", {
         description: `${failed} of ${total} record(s) failed retrieval or analysis. No fallback text was used.`,
