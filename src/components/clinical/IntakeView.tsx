@@ -5,22 +5,25 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useClinicalStore } from "@/lib/clinical/store";
+import { isVisibleClinicalFile } from "@/lib/clinical/data";
 
 export function IntakeView() {
-<<<<<<< HEAD
   const { docs, addFiles, loadSampleCase, removeDoc, clearIntake, setView, batchActive, queuedBatches, processingCaseId } = useClinicalStore();
-  const stagedDocs = docs.filter((doc) => !doc.analyzed && !doc.processed && doc.caseId !== processingCaseId);
+  const stagedDocs = docs.filter((doc) => isVisibleClinicalFile(doc.name) && !doc.analyzed && !doc.processed && doc.caseId !== processingCaseId);
   const queuedDocIds = new Set(queuedBatches.flatMap((batch) => batch.docIds));
-=======
-  const { docs, addFiles, loadSampleCase, removeDoc, clearIntake, setView, batchActive, queuedDocIds } = useClinicalStore();
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
   const ingest = (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
-    const selectedFiles = Array.from(files);
+    const selectedFiles = Array.from(files).filter((file) => isVisibleClinicalFile(file.name));
+    if (selectedFiles.length === 0) {
+      toast.info("No supported clinical documents selected", {
+        description: "JSON and ICO files are not shown or imported.",
+      });
+      return;
+    }
     const n = addFiles(
       selectedFiles.map((file) => ({
         name: file.name,
@@ -40,13 +43,8 @@ export function IntakeView() {
     }
   };
 
-<<<<<<< HEAD
   const pages = stagedDocs.reduce((a, d) => a + d.pages, 0);
   const sizeMb = (stagedDocs.reduce((a, d) => a + d.sizeKb, 0) / 1024).toFixed(2);
-=======
-  const pages = docs.reduce((a, d) => a + d.pages, 0);
-  const sizeMb = (docs.reduce((a, d) => a + d.sizeKb, 0) / 1024).toFixed(2);
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
 
   return (
     <div className="space-y-6">
@@ -63,13 +61,8 @@ export function IntakeView() {
           <Button variant="outline" onClick={loadSampleCase}>
             <FolderOpen className="mr-2 size-4" /> Load sample case
           </Button>
-<<<<<<< HEAD
           <Button disabled={stagedDocs.length === 0} onClick={() => setView("ocr")}>
              Process docs
-=======
-          <Button disabled={docs.length === 0} onClick={() => setView("ocr")}>
-             Continue to processing
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
           </Button>
         </div>
       </section>
@@ -119,19 +112,11 @@ export function IntakeView() {
           <div>
            <h3 className="font-serif text-lg text-foreground">Records ready for review</h3>
             <p className="text-mono-xs text-muted-foreground">
-<<<<<<< HEAD
               {stagedDocs.length} document(s) · {pages ? `${pages} page(s) analyzed` : "pages analyzed in Process & Translation"} · {sizeMb} MB
               {batchActive && queuedDocIds.size > 0 ? ` · ${queuedDocIds.size} queued` : ""}
             </p>
           </div>
           {stagedDocs.length > 0 && (
-=======
-              {docs.length} document(s) · {pages ? `${pages} page(s) analyzed` : "pages analyzed in Process & Translation"} · {sizeMb} MB
-              {batchActive && queuedDocIds.length > 0 ? ` · ${queuedDocIds.length} queued` : ""}
-            </p>
-          </div>
-          {docs.length > 0 && (
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
             <Button
               variant="ghost"
               size="sm"
@@ -145,7 +130,6 @@ export function IntakeView() {
           )}
         </header>
 
-<<<<<<< HEAD
         {stagedDocs.length === 0 ? (
           <p className="px-5 py-10 text-center text-sm text-muted-foreground">
             No documents staged. Upload files or review processed records in Patient Cases.
@@ -153,15 +137,6 @@ export function IntakeView() {
         ) : (
           <ul className="divide-y divide-border">
             {stagedDocs.map((d) => (
-=======
-        {docs.length === 0 ? (
-          <p className="px-5 py-10 text-center text-sm text-muted-foreground">
-            No documents staged. Upload files or load the sample multilingual case.
-          </p>
-        ) : (
-          <ul className="divide-y divide-border">
-            {docs.map((d) => (
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
               <li key={d.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm text-foreground">{d.name}</p>
@@ -169,11 +144,7 @@ export function IntakeView() {
                     Record ID {d.id} · staged for processing · {d.sizeKb} KB
                   </p>
                 </div>
-<<<<<<< HEAD
                 {queuedDocIds.has(d.id) ? (
-=======
-                {queuedDocIds.includes(d.id) ? (
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
                   <Badge variant="secondary" className="text-mono-xs text-warning">
                     Queued
                   </Badge>
@@ -197,7 +168,6 @@ export function IntakeView() {
           </ul>
         )}
       </section>
-<<<<<<< HEAD
 
       {queuedBatches.length > 0 && (
         <section className="panel space-y-3 p-5">
@@ -219,8 +189,6 @@ export function IntakeView() {
           </div>
         </section>
       )}
-=======
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
     </div>
   );
 }

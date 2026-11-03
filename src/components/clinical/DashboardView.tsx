@@ -28,6 +28,7 @@ import {
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { useClinicalStore } from "@/lib/clinical/store";
+import { isVisibleClinicalFile } from "@/lib/clinical/data";
 
 const DAY_MS = 86_400_000;
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -49,11 +50,12 @@ const TOOLTIP_STYLE = {
 } as const;
 
 export function DashboardView() {
-<<<<<<< HEAD
   const { folders, synthesis, ocrComplete, reportReady, setView } =
     useClinicalStore();
   const caseFolders = Object.values(folders);
-  const overviewDocs = caseFolders.length > 0 ? caseFolders.flatMap((folder) => folder.docs) : [];
+  const overviewDocs = caseFolders.length > 0
+    ? caseFolders.flatMap((folder) => folder.docs).filter((doc) => isVisibleClinicalFile(doc.name))
+    : [];
   const overviewSynthesis = synthesis && caseFolders.some((folder) => folder.caseId === synthesis.caseId)
     ? synthesis
     : null;
@@ -64,16 +66,6 @@ export function DashboardView() {
   const pages = overviewDocs.reduce((a, d) => a + d.pages, 0);
 
   const processedDocs = overviewDocs.filter((doc) => doc.analyzed && doc.processed);
-=======
-  const { docs, reportsGenerated, synthesis, ocrComplete, reportReady, setView } =
-    useClinicalStore();
-
-  // Documents persisted before upload timestamps existed count as this session's intake.
-  const sessionStart = useRef(Date.now());
-  const pages = docs.reduce((a, d) => a + d.pages, 0);
-
-  const processedDocs = docs.filter((doc) => doc.analyzed && doc.processed);
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
   const processedPages = processedDocs.reduce((total, doc) => total + doc.pages, 0);
   const accuracy = processedDocs.length
     ? (
@@ -87,22 +79,14 @@ export function DashboardView() {
   const metrics = [
     {
       label: "Total reports generated",
-<<<<<<< HEAD
       value: String(overviewReports),
-=======
-      value: String(reportsGenerated),
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
       hint: "completed clinical reports",
       icon: FileText,
     },
     {
       label: "Total intake pages processed",
       value: processedPages.toLocaleString("en-GB"),
-<<<<<<< HEAD
       hint: `${overviewDocs.length} document(s) · ${pages} page(s) in patient cases`,
-=======
-      hint: `${docs.length} document(s) · ${pages} page(s) in this session`,
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
       icon: FileStack,
     },
     {
@@ -115,13 +99,8 @@ export function DashboardView() {
     },
     {
       label: "Current case risk",
-<<<<<<< HEAD
       value: overviewSynthesis?.risk ?? "—",
       hint: overviewSynthesis ? `case ${overviewSynthesis.caseId}` : "no active clinical summary",
-=======
-      value: synthesis?.risk ?? "—",
-      hint: synthesis ? `case ${synthesis.caseId}` : "no active clinical summary",
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
       icon: AlertTriangle,
     },
   ];
@@ -134,11 +113,7 @@ export function DashboardView() {
       const day = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
       buckets.set(day.toDateString(), 0);
     }
-<<<<<<< HEAD
     overviewDocs.forEach((doc) => {
-=======
-    docs.forEach((doc) => {
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
       const key = new Date(doc.uploadedAt ?? sessionStart.current).toDateString();
       if (buckets.has(key)) buckets.set(key, (buckets.get(key) ?? 0) + 1);
     });
@@ -146,43 +121,25 @@ export function DashboardView() {
       day: DAY_LABELS[new Date(key).getDay()],
       records: count,
     }));
-<<<<<<< HEAD
   }, [overviewDocs]);
-=======
-  }, [docs]);
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
 
   // 2 — Document type distribution, from each record's classification.
   const typeDistribution = useMemo(() => {
     const counts = new Map<string, number>();
-<<<<<<< HEAD
     overviewDocs.forEach((doc) => {
-=======
-    docs.forEach((doc) => {
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
       const label = doc.classification ? TYPE_LABELS[doc.classification] ?? doc.classification : "Unclassified";
       counts.set(label, (counts.get(label) ?? 0) + 1);
     });
     return Array.from(counts.entries()).map(([type, count]) => ({ type, count }));
-<<<<<<< HEAD
   }, [overviewDocs]);
-=======
-  }, [docs]);
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
 
   // 3 — Comparison: processed records vs generated reports.
   const comparison = useMemo(
     () => [
       { name: "Records processed", value: processedDocs.length, fill: "var(--color-chart-1)" },
-<<<<<<< HEAD
       { name: "Reports generated", value: overviewReports, fill: "var(--color-chart-2)" },
     ],
     [processedDocs.length, overviewReports],
-=======
-      { name: "Reports generated", value: reportsGenerated, fill: "var(--color-chart-2)" },
-    ],
-    [processedDocs.length, reportsGenerated],
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
   );
 
   // 4 — Processing status donut: complete vs in-progress vs queued.
@@ -190,11 +147,7 @@ export function DashboardView() {
     let complete = 0;
     let inProgress = 0;
     let queued = 0;
-<<<<<<< HEAD
     overviewDocs.forEach((doc) => {
-=======
-    docs.forEach((doc) => {
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
       if (doc.analyzed && doc.processed) complete += 1;
       else if (doc.analyzed || doc.processing) inProgress += 1;
       else queued += 1;
@@ -204,15 +157,9 @@ export function DashboardView() {
       { name: "In progress", value: inProgress, fill: "var(--color-chart-3)" },
       { name: "Queued", value: queued, fill: "var(--color-chart-1)" },
     ].filter((s) => s.value > 0);
-<<<<<<< HEAD
   }, [overviewDocs]);
 
   const statusTotal = overviewDocs.length;
-=======
-  }, [docs]);
-
-  const statusTotal = docs.length;
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
 
   return (
     <div className="space-y-6">
@@ -394,15 +341,9 @@ export function DashboardView() {
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {[
-<<<<<<< HEAD
             { step: "Step 1", label: "Document intake", done: overviewDocs.length > 0, icon: FileStack },
             { step: "Step 2", label: "Processing & translation", done: ocrComplete, icon: ScanSearch },
             { step: "Step 3", label: "Clinical summary & timeline", done: Boolean(overviewSynthesis), icon: GitMerge },
-=======
-            { step: "Step 1", label: "Document intake", done: docs.length > 0, icon: FileStack },
-            { step: "Step 2", label: "Processing & translation", done: ocrComplete, icon: ScanSearch },
-            { step: "Step 3", label: "Clinical summary & timeline", done: Boolean(synthesis), icon: GitMerge },
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
             { step: "Step 4", label: "Evaluation report", done: reportReady, icon: CheckCircle2 },
           ].map((s) => (
             <div key={s.step} className="rounded-md border border-border bg-surface px-3 py-3 text-sm">

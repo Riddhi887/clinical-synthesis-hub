@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useClinicalStore } from "@/lib/clinical/store";
+import { isVisibleClinicalFile } from "@/lib/clinical/data";
 
 const RISK_STYLES: Record<string, string> = {
   STABLE: "bg-success/15 text-success",
@@ -16,12 +17,12 @@ export function WorkspaceView() {
   const slots = [
     {
       name: "Imported records",
-      count: docs.length,
+      count: docs.filter((doc) => isVisibleClinicalFile(doc.name)).length,
       note: "source documents available for review",
     },
     {
       name: "Reviewed records",
-      count: docs.filter((d) => d.processed).length,
+      count: docs.filter((d) => isVisibleClinicalFile(d.name) && d.processed).length,
       note: "records prepared in clear clinical English",
     },
     {

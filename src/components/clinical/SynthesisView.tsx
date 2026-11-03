@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 import { useEffect, useRef, useState } from "react";
-=======
-import { useState } from "react";
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
 import { toast } from "sonner";
 import { AlertTriangle, GitMerge, Stethoscope, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,39 +13,29 @@ const RISK_STYLES: Record<string, string> = {
 };
 
 export function SynthesisView() {
-  const { docs, ocrComplete, synthesis, buildSynthesis, setView } = useClinicalStore();
+  const { docs, ocrComplete, synthesis, synthesisStale, buildSynthesis, setView } = useClinicalStore();
   const [busy, setBusy] = useState(false);
-<<<<<<< HEAD
   const autoBuiltRef = useRef(false);
-=======
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
+  const sampleCaseReady = docs.length > 0 && docs.every((doc) => doc.origin === "sample");
 
   const build = () => {
     setBusy(true);
     window.setTimeout(() => {
-      const s = buildSynthesis();
+      buildSynthesis();
       setBusy(false);
       toast.success("Chronological synthesis complete", {
-        description: `Case ${s.caseId} now includes ${s.timeline.length} care events.`,
+        description: "The current patient case now includes all completed care events.",
       });
-<<<<<<< HEAD
-      setView("report");
     }, 900);
   };
 
   useEffect(() => {
-    if (ocrComplete && docs.length > 0 && !busy && !autoBuiltRef.current) {
+    if ((ocrComplete || sampleCaseReady) && docs.length > 0 && !busy && !autoBuiltRef.current) {
       autoBuiltRef.current = true;
-      if (synthesis) setView("report");
-      else build();
+      if (!synthesis || synthesisStale) build();
     }
-  }, [ocrComplete, docs.length, synthesis, busy, setView]);
+  }, [ocrComplete, sampleCaseReady, docs.length, synthesis, synthesisStale, busy]);
 
-=======
-    }, 900);
-  };
-
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
   return (
     <div className="space-y-6">
       <section className="panel flex flex-wrap items-end justify-between gap-4 p-5">
@@ -61,7 +47,7 @@ export function SynthesisView() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button onClick={build} disabled={busy || !ocrComplete || docs.length === 0}>
+          <Button onClick={build} disabled={busy || (!ocrComplete && !sampleCaseReady) || docs.length === 0}>
             <GitMerge className="mr-2 size-4" />
              {busy ? "Preparing…" : synthesis ? "Refresh summary" : "Prepare summary"}
           </Button>
@@ -71,7 +57,7 @@ export function SynthesisView() {
         </div>
       </section>
 
-      {!ocrComplete && (
+      {!ocrComplete && !sampleCaseReady && (
         <section className="panel p-10 text-center">
           <p className="text-sm text-muted-foreground">
              Process and translate the medical records before preparing the clinical summary.
@@ -79,6 +65,12 @@ export function SynthesisView() {
           <Button className="mt-4" variant="outline" onClick={() => setView("ocr")}>
              Go to record processing
           </Button>
+        </section>
+      )}
+
+      {synthesis && synthesisStale && (
+        <section className="panel border-warning/40 bg-warning/5 p-4 text-sm text-warning-foreground">
+          This summary is outdated. Complete processing for the updated case before rebuilding it.
         </section>
       )}
 
@@ -157,11 +149,7 @@ export function SynthesisView() {
           </section>
 
           <section className="panel space-y-7 p-5">
-<<<<<<< HEAD
             <div className="max-h-136 space-y-7 overflow-y-auto pr-2">
-=======
-            <div className="max-h-[34rem] space-y-7 overflow-y-auto pr-2">
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
               <section className="space-y-3">
                 <h3 className="font-serif text-xl text-foreground">Clinical summary</h3>
                 <p className="max-w-5xl text-base leading-8 text-foreground">
@@ -179,7 +167,6 @@ export function SynthesisView() {
                 ))}
               </DataTable>
 
-<<<<<<< HEAD
               <DataTable
                 title="Medications identified in the translated records"
                 columns={["Medication", "Dosage", "Daily Intake (Frequency)", "Duration / Time", "Instructions"]}
@@ -195,15 +182,6 @@ export function SynthesisView() {
                     <td className="px-3 py-3 text-sm text-muted-foreground">
                       {medication.instructions || "Follow prescription instructions"}
                     </td>
-=======
-              <DataTable title="Medications identified in the translated records" columns={["Medication", "Dosage", "Frequency", "Period"]}>
-                {synthesis.medications.map((medication) => (
-                  <tr key={medication.name} className="border-t border-border align-top">
-                    <td className="px-3 py-3 text-sm">{medication.name}</td>
-                    <td className="px-3 py-3 text-sm">{medication.dosage}</td>
-                    <td className="px-3 py-3 text-sm">{medication.frequency}</td>
-                    <td className="px-3 py-3 text-sm">{medication.since}</td>
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
                   </tr>
                 ))}
               </DataTable>
@@ -246,7 +224,6 @@ function describeCase(synthesis: Synthesis) {
     ? `The records describe ${synthesis.diagnoses.map((diagnosis) => diagnosis.label).join(", ")}.`
     : "No diagnosis was identified in the translated records.";
   const medicationText = synthesis.medications.length
-<<<<<<< HEAD
     ? `The documented medications are ${synthesis.medications
         .map(
           (m) =>
@@ -255,9 +232,6 @@ function describeCase(synthesis: Synthesis) {
             }${m.instructions && m.instructions !== "Follow prescription instructions" ? `, timing: ${m.instructions}` : ""})`,
         )
         .join("; ")}.`
-=======
-    ? `The documented medications are ${synthesis.medications.map((medication) => `${medication.name} (${medication.dosage}, ${medication.frequency})`).join(", ")}.`
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
     : "No medication information was identified in the translated records.";
   return `${synthesis.patientName} is a ${synthesis.age || "not specified"}-year-old ${synthesis.sex.toLowerCase()} patient with medical record number ${synthesis.mrn}. ${diagnosisText} ${medicationText} ${physicianText} The care events below are limited to information retrieved and translated from the submitted documents; details not present in those records are not inferred.`;
 }
@@ -267,11 +241,7 @@ function DataTable({ title, columns, children }: { title: string; columns: strin
     <section className="space-y-3">
       <h3 className="font-serif text-xl text-foreground">{title}</h3>
       <div className="overflow-x-auto rounded-md border border-border">
-<<<<<<< HEAD
         <table className="min-w-176 w-full border-collapse text-left">
-=======
-        <table className="min-w-[44rem] w-full border-collapse text-left">
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
           <thead className="bg-surface text-mono-xs uppercase tracking-widest text-muted-foreground">
             <tr>{columns.map((column) => <th key={column} className="px-3 py-3 font-medium">{column}</th>)}</tr>
           </thead>

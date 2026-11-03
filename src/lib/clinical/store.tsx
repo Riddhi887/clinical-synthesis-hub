@@ -11,10 +11,7 @@ import {
 import {
   SAMPLE_CASE,
   type ClinicalDoc,
-<<<<<<< HEAD
   type MedicationRecord,
-=======
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
   type Synthesis,
 } from "./data";
 
@@ -36,15 +33,15 @@ export interface CaseAsset {
   hasReport: boolean;
 }
 
-<<<<<<< HEAD
 export interface QueuedBatch {
   caseId: string;
   docIds: string[];
   createdAt: number;
+  priority: "priority" | "normal";
+  reason: "retry" | "update" | "new-case";
+  retryCount: number;
 }
 
-=======
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
 /** A patient-scoped folder: every asset here belongs to exactly one case id. */
 export interface PatientFolder {
   caseId: string;
@@ -54,6 +51,8 @@ export interface PatientFolder {
   docs: ClinicalDoc[];
   synthesis: Synthesis | null;
   reportReady: boolean;
+  synthesisStale: boolean;
+  reportStale: boolean;
 }
 
 interface PersistedState {
@@ -64,27 +63,24 @@ interface PersistedState {
   ocrComplete: boolean;
   synthesis: Synthesis | null;
   reportReady: boolean;
+  synthesisStale: boolean;
+  reportStale: boolean;
   cases: CaseAsset[];
   folders: Record<string, PatientFolder>;
   activeCaseId: string | null;
   reportsGenerated: number;
   /** Documents staged while a processing batch is running; processed after it finishes. */
-<<<<<<< HEAD
   queuedBatches: QueuedBatch[];
   batchActive: boolean;
   processingCaseId: string | null;
   processingDocName: string | null;
   processingProgress: number;
   processingStatus: string;
-=======
-  queuedDocIds: string[];
-  batchActive: boolean;
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
   sidebarCollapsed: boolean;
 }
 
-const STORAGE_KEY = "chss.session.v9";
-const LEGACY_STORAGE_KEYS = ["chss.session.v2", "chss.session.v3", "chss.session.v4", "chss.session.v5", "chss.session.v6", "chss.session.v7", "chss.session.v8"];
+const STORAGE_KEY = "chss.session.v12";
+const LEGACY_STORAGE_KEYS = ["chss.session.v2", "chss.session.v3", "chss.session.v4", "chss.session.v5", "chss.session.v6", "chss.session.v7", "chss.session.v8", "chss.session.v9", "chss.session.v10", "chss.session.v11"];
 
 const initialState: PersistedState = {
   user: null,
@@ -94,32 +90,31 @@ const initialState: PersistedState = {
   ocrComplete: false,
   synthesis: null,
   reportReady: false,
+  synthesisStale: false,
+  reportStale: false,
   cases: [],
   folders: {},
   activeCaseId: null,
   reportsGenerated: 0,
-<<<<<<< HEAD
   queuedBatches: [],
   batchActive: false,
   processingCaseId: null,
   processingDocName: null,
   processingProgress: 0,
   processingStatus: "Waiting to process records",
-=======
-  queuedDocIds: [],
-  batchActive: false,
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
   sidebarCollapsed: false,
 };
 
 /** Per-user workspace archive: what a signed-out reviewer keeps (records, summaries, reports, KPIs). */
-const WORKSPACE_ARCHIVE_PREFIX = "chss.workspace.v1:";
+const WORKSPACE_ARCHIVE_PREFIX = "chss.workspace.v4:";
 
 interface WorkspaceSnapshot {
   docs: ClinicalDoc[];
   ocrComplete: boolean;
   synthesis: Synthesis | null;
   reportReady: boolean;
+  synthesisStale: boolean;
+  reportStale: boolean;
   cases: CaseAsset[];
   folders: Record<string, PatientFolder>;
   reportsGenerated: number;
@@ -130,6 +125,8 @@ const emptyWorkspaceSnapshot = (): WorkspaceSnapshot => ({
   ocrComplete: false,
   synthesis: null,
   reportReady: false,
+  synthesisStale: false,
+  reportStale: false,
   cases: [],
   folders: {},
   reportsGenerated: 0,
@@ -149,6 +146,8 @@ function readWorkspaceArchive(email: string): WorkspaceSnapshot {
       ocrComplete: parsed.ocrComplete ?? false,
       synthesis: parsed.synthesis ?? null,
       reportReady: parsed.reportReady ?? false,
+      synthesisStale: parsed.synthesisStale ?? false,
+      reportStale: parsed.reportStale ?? false,
       cases: parsed.cases ?? [],
       folders: Object.fromEntries(
         Object.entries(parsed.folders ?? {}).map(([id, folder]) => [
@@ -171,6 +170,8 @@ function writeWorkspaceArchive(email: string, s: PersistedState) {
       ocrComplete: s.ocrComplete,
       synthesis: s.synthesis,
       reportReady: s.reportReady,
+      synthesisStale: s.synthesisStale,
+      reportStale: s.reportStale,
       cases: s.cases,
       folders: s.folders,
       reportsGenerated: s.reportsGenerated,
@@ -194,6 +195,24 @@ export function newCaseId() {
   return `CASE-PAT-8839201-${newUuid().slice(0, 8).toUpperCase()}`;
 }
 
+function mergeQueuedBatch(batches: QueuedBatch[], incoming: QueuedBatch): QueuedBatch[] {
+  const existing = batches.find((batch) => batch.caseId === incoming.caseId);
+  if (!existing) {
+    return [...batches, incoming].sort((a, b) => Number(b.priority === "priority") - Number(a.priority === "priority"));
+  }
+  return batches
+    .map((batch) => batch.caseId === incoming.caseId
+      ? {
+          ...batch,
+          docIds: Array.from(new Set([...batch.docIds, ...incoming.docIds])),
+          priority: batch.priority === "priority" || incoming.priority === "priority" ? "priority" : "normal",
+          reason: incoming.reason === "retry" ? "retry" : batch.reason,
+          retryCount: Math.max(batch.retryCount, incoming.retryCount),
+        }
+      : batch)
+    .sort((a, b) => Number(b.priority === "priority") - Number(a.priority === "priority"));
+}
+
 interface StoreValue extends PersistedState {
   hydrated: boolean;
   /** Latest documents straight from the store, even after this view unmounts (queue draining). */
@@ -211,6 +230,7 @@ interface StoreValue extends PersistedState {
       translatedText?: string;
       ocrConfidence?: number;
       translationQuality?: number;
+      caseId?: string;
       sourceFile?: File;
     }[],
   ) => number;
@@ -220,31 +240,20 @@ interface StoreValue extends PersistedState {
   clearIntake: () => void;
   appendLog: (line: string) => void;
   finishOcr: (docs: ClinicalDoc[]) => void;
-<<<<<<< HEAD
   markOcrComplete: (caseId?: string) => void;
   buildSynthesis: (caseId?: string) => Synthesis;
   markReportReady: () => void;
+  retryCaseDocuments: (caseId: string, docIds: string[]) => void;
   beginBatch: () => void;
   endBatch: () => void;
   takeQueued: () => QueuedBatch | null;
   assignDocsToCase: (docIds: string[], caseId: string) => void;
   setProcessingState: (changes: Partial<Pick<PersistedState, "processingCaseId" | "processingDocName" | "processingProgress" | "processingStatus">>) => void;
-=======
-  markOcrComplete: () => void;
-  buildSynthesis: () => Synthesis;
-  markReportReady: () => void;
-  beginBatch: () => void;
-  endBatch: () => void;
-  takeQueued: () => string[];
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
   toggleSidebar: () => void;
   openCase: (caseId: string) => void;
   closeCase: () => void;
   startNewCase: () => void;
-<<<<<<< HEAD
   deleteCase: (caseId: string) => Promise<boolean>;
-=======
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
 }
 
 const StoreContext = createContext<StoreValue | null>(null);
@@ -273,8 +282,19 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
           ...parsed,
           docs: cleanDocs(parsed.docs ?? []),
           folders: Object.fromEntries(
-            Object.entries(parsed.folders ?? {}).map(([id, f]) => [id, { ...f, docs: cleanDocs(f.docs) }]),
+            Object.entries(parsed.folders ?? {}).map(([id, f]) => [id, {
+              ...f,
+              docs: cleanDocs(f.docs),
+              synthesisStale: f.synthesisStale ?? false,
+              reportStale: f.reportStale ?? false,
+            }]),
           ),
+          queuedBatches: [],
+          batchActive: false,
+          processingCaseId: null,
+          processingDocName: null,
+          processingProgress: 0,
+          processingStatus: "Waiting to process records",
         });
       }
     } catch {
@@ -321,20 +341,15 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
         }),
       setView: (view) => patch({ view }),
       addFiles: (files) => {
-<<<<<<< HEAD
-        const importCaseId = stateRef.current.view === "intake" || stateRef.current.batchActive
+        const requestedCaseId = files.find((file) => file.caseId)?.caseId;
+        const importCaseId = requestedCaseId ?? (stateRef.current.view === "intake" || stateRef.current.batchActive
           ? newCaseId()
-          : undefined;
-=======
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
+          : undefined);
         const created: ClinicalDoc[] = files.map((f) => {
           return {
             id: newUuid(),
             name: f.name,
-<<<<<<< HEAD
             ...(importCaseId ? { caseId: importCaseId } : {}),
-=======
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
             origin: "upload",
             processing: true,
             analyzed: false,
@@ -349,39 +364,45 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
             translatedText: f.translatedText ?? "",
             ocrConfidence: f.ocrConfidence ?? 0,
             translationQuality: f.translationQuality ?? 0,
+            retryCount: 0,
             processed: false,
           };
         });
         setState((s) => {
-<<<<<<< HEAD
-          const openFolder = s.view === "patient" && s.activeCaseId
-            ? s.folders[s.activeCaseId]
-            : undefined;
-=======
-          const openFolder = s.activeCaseId ? s.folders[s.activeCaseId] : undefined;
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
+          const existingFolder = importCaseId ? s.folders[importCaseId] : undefined;
+          const isCaseUpdate = Boolean(existingFolder);
+          const queued = (s.batchActive || isCaseUpdate) && importCaseId
+            ? mergeQueuedBatch(s.queuedBatches, {
+                caseId: importCaseId,
+                docIds: created.map((d) => d.id),
+                createdAt: Date.now(),
+                priority: isCaseUpdate ? "priority" : "normal",
+                reason: isCaseUpdate ? "update" : "new-case",
+                retryCount: 0,
+              })
+            : s.queuedBatches;
           return {
             ...s,
             docs: [...s.docs, ...created],
             // While a batch is processing, new files join the isolated queue instead
             // of the active batch stream.
-<<<<<<< HEAD
-            queuedBatches: s.batchActive && importCaseId
-              ? [...s.queuedBatches, { caseId: importCaseId, docIds: created.map((d) => d.id), createdAt: Date.now() }]
-              : s.queuedBatches,
+            queuedBatches: queued,
             activeCaseId: !s.batchActive && importCaseId ? importCaseId : s.activeCaseId,
-=======
-            queuedDocIds: s.batchActive
-              ? [...s.queuedDocIds, ...created.map((d) => d.id)]
-              : s.queuedDocIds,
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
-            ocrComplete: false,
-            reportReady: false,
+            ocrComplete: isCaseUpdate ? false : s.ocrComplete,
+            reportReady: isCaseUpdate ? false : s.reportReady,
+            synthesisStale: isCaseUpdate ? true : s.synthesisStale,
+            reportStale: isCaseUpdate ? true : s.reportStale,
             // Uploads made inside an open patient folder stay bound to that folder.
-            folders: openFolder
+            folders: existingFolder
               ? {
                   ...s.folders,
-                  [openFolder.caseId]: { ...openFolder, docs: [...openFolder.docs, ...created] },
+                  [existingFolder.caseId]: {
+                    ...existingFolder,
+                    docs: [...existingFolder.docs, ...created],
+                    synthesisStale: true,
+                    reportStale: true,
+                    reportReady: false,
+                  },
                 }
               : s.folders,
           };
@@ -389,9 +410,53 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
         return created.length;
       },
       updateDoc: (id, changes) =>
-        patch((s) => ({
-          docs: s.docs.map((doc) => (doc.id === id ? { ...doc, ...changes } : doc)),
-        })),
+        patch((s) => {
+          const docs = s.docs.map((doc) => (doc.id === id ? { ...doc, ...changes } : doc));
+          const updated = docs.find((doc) => doc.id === id);
+          if (!updated?.caseId) return { docs };
+          const caseDocs = docs.filter((doc) => doc.caseId === updated.caseId);
+          const existingFolder = s.folders[updated.caseId];
+          const patientName = updated.patientName ?? updated.fields?.["patient_name"];
+          if (!existingFolder && !patientName) return { docs };
+          const folder: PatientFolder = existingFolder
+            ? {
+                ...existingFolder,
+                patientName: patientName ?? existingFolder.patientName,
+                mrn: updated.fields?.["mrn"] ?? existingFolder.mrn,
+                docs: caseDocs,
+              }
+            : {
+                caseId: updated.caseId,
+                patientName: patientName ?? "Patient pending OCR",
+                mrn: updated.fields?.["mrn"] ?? "Not specified",
+                createdAt: Date.now(),
+                docs: caseDocs,
+                synthesis: null,
+                reportReady: false,
+                synthesisStale: false,
+                reportStale: false,
+              };
+          const pages = caseDocs.reduce((total, doc) => total + doc.pages, 0);
+          const caseAsset: CaseAsset = {
+            caseId: folder.caseId,
+            patientName: folder.patientName,
+            createdAt: folder.createdAt,
+            docCount: caseDocs.length,
+            pages,
+            risk: folder.synthesis?.risk ?? "STABLE",
+            hasReport: folder.reportReady && !folder.reportStale,
+          };
+          return {
+            docs,
+            cases: s.cases.some((item) => item.caseId === folder.caseId)
+              ? s.cases.map((item) => item.caseId === folder.caseId ? caseAsset : item)
+              : [caseAsset, ...s.cases],
+            folders: {
+              ...s.folders,
+              [updated.caseId]: folder,
+            },
+          };
+        }),
       loadSampleCase: () => {
         const created: ClinicalDoc[] = SAMPLE_CASE.map((d) => ({
           ...d,
@@ -401,39 +466,47 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
           processed: false,
           uploadedAt: Date.now(),
         }));
-<<<<<<< HEAD
-        patch({ docs: created, activeCaseId: null, ocrComplete: false, reportReady: false, synthesis: null, logs: [], queuedBatches: [], batchActive: false });
+        patch({ docs: created, activeCaseId: null, ocrComplete: false, reportReady: false, synthesis: null, synthesisStale: false, reportStale: false, logs: [], queuedBatches: [], batchActive: false });
       },
       removeDoc: (id) =>
-        patch((s) => ({
-          docs: s.docs.filter((d) => d.id !== id),
-          queuedBatches: s.queuedBatches
-            .map((batch) => ({ ...batch, docIds: batch.docIds.filter((docId) => docId !== id) }))
-            .filter((batch) => batch.docIds.length > 0),
-          reportReady: false,
-        })),
+        patch((s) => {
+          const removed = s.docs.find((doc) => doc.id === id);
+          return {
+            docs: s.docs.filter((d) => d.id !== id),
+            queuedBatches: s.queuedBatches
+              .map((batch) => ({ ...batch, docIds: batch.docIds.filter((docId) => docId !== id) }))
+              .filter((batch) => batch.docIds.length > 0),
+            reportReady: false,
+            synthesisStale: removed?.caseId ? true : s.synthesisStale,
+            reportStale: removed?.caseId ? true : s.reportStale,
+            folders: removed?.caseId && s.folders[removed.caseId]
+              ? {
+                  ...s.folders,
+                  [removed.caseId]: {
+                    ...s.folders[removed.caseId],
+                    docs: s.folders[removed.caseId].docs.filter((doc) => doc.id !== id),
+                    synthesisStale: true,
+                    reportStale: true,
+                    reportReady: false,
+                  },
+                }
+              : s.folders,
+          };
+        }),
       clearIntake: () =>
-        patch({ docs: [], logs: [], ocrComplete: false, synthesis: null, reportReady: false, queuedBatches: [] }),
-=======
-        patch({ docs: created, activeCaseId: null, ocrComplete: false, reportReady: false, synthesis: null, logs: [], queuedDocIds: [], batchActive: false });
-      },
-      removeDoc: (id) =>
-        patch((s) => ({ docs: s.docs.filter((d) => d.id !== id), reportReady: false })),
-      clearIntake: () =>
-        patch({ docs: [], logs: [], ocrComplete: false, synthesis: null, reportReady: false }),
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
+        patch({ docs: [], logs: [], ocrComplete: false, synthesis: null, reportReady: false, synthesisStale: false, reportStale: false, queuedBatches: [] }),
       appendLog: (line) => {
         const ts = new Date().toLocaleTimeString("en-GB", { hour12: false });
         // Processing telemetry stays in the developer console only; the UI remains clean.
         console.info(`[clinical-pipeline ${ts}] ${line}`);
       },
       finishOcr: (docs) => patch({ docs, ocrComplete: true }),
-<<<<<<< HEAD
       markOcrComplete: (caseId) =>
         patch((s) => {
-          const targetDocs = caseId ? s.docs.filter((doc) => doc.caseId === caseId) : s.docs;
+          const caseDocs = caseId ? s.docs.filter((doc) => doc.caseId === caseId) : s.docs;
+          const targetDocs = caseDocs.length > 0 ? caseDocs : s.docs;
           const complete = targetDocs.length > 0 && targetDocs.every(
-            (doc) => doc.analyzed && doc.originalText.trim() && doc.translatedText.trim(),
+            (doc) => doc.origin === "sample" || (doc.analyzed && doc.originalText.trim() && doc.translatedText.trim()),
           );
           return {
             docs: s.docs.map((doc) => doc.caseId === caseId
@@ -448,24 +521,7 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
           const targetCaseId = caseId ?? s.activeCaseId;
           const caseDocs = targetCaseId ? s.docs.filter((doc) => doc.caseId === targetCaseId) : s.docs;
           const processedDocs = s.docs.filter(
-            (doc) => caseDocs.includes(doc) && doc.processed && doc.translatedText.trim(),
-=======
-      markOcrComplete: () =>
-        patch((s) => {
-          const complete = s.docs.length > 0 && s.docs.every(
-            (doc) => doc.analyzed && doc.originalText.trim() && doc.translatedText.trim(),
-          );
-          return {
-            docs: s.docs.map((doc) => ({ ...doc, processed: complete && Boolean(doc.analyzed), processing: false })),
-            ocrComplete: complete,
-          };
-        }),
-      buildSynthesis: () => {
-        let result!: Synthesis;
-        setState((s) => {
-          const processedDocs = s.docs.filter(
-            (doc) => doc.processed && doc.translatedText.trim(),
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
+            (doc) => caseDocs.includes(doc) && (doc.processed || doc.origin === "sample") && doc.translatedText.trim(),
           );
           const cleanedDocs = processedDocs.map((doc) => ({
             doc,
@@ -499,13 +555,9 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
             combinedText,
             /(?:pre-operative diagnosis|post-operative diagnosis|diagnosis|diagnoses|impression)\s*[:\-]?\s*([^\n]+)/gi,
           );
-<<<<<<< HEAD
           const extractedMedications = extractMedicationItems(combinedText);
           const structuredMedications = processedDocs.flatMap((doc) => doc.medications ?? []);
           const medications = mergeMedicationItems(structuredMedications, extractedMedications);
-=======
-          const medications = extractMedicationItems(combinedText);
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
           const timeline = cleanedDocs.map(({ doc, text }, index) => ({
             id: `uploaded-${index + 1}`,
             date: extractDate(text),
@@ -516,11 +568,7 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
           }));
           const gaps = detectGaps(processedDocs, combinedText);
           // Reuse the open folder's case so repeated synthesis keeps one patient folder.
-<<<<<<< HEAD
           const resolvedCaseId = targetCaseId ?? newCaseId();
-=======
-          const caseId = s.activeCaseId ?? newCaseId();
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
           const synthesis: Synthesis = {
               patientName,
               age: ageMatch ? Number(ageMatch[1]) : 0,
@@ -533,11 +581,7 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
               timeline,
               gaps,
               risk: gaps.length ? "ACTION REQUIRED" : "STABLE",
-<<<<<<< HEAD
               caseId: resolvedCaseId,
-=======
-              caseId,
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
               createdAt: Date.now(),
             } satisfies Synthesis;
           result = synthesis;
@@ -546,53 +590,42 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
             caseId: synthesis.caseId,
             patientName: synthesis.patientName,
             createdAt: synthesis.createdAt,
-<<<<<<< HEAD
             docCount: caseDocs.length,
-=======
-            docCount: s.docs.length,
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
             pages,
             risk: synthesis.risk,
-            hasReport: s.reportReady,
+            hasReport: s.reportReady && !s.reportStale,
           };
           const cases = s.cases.some((c) => c.caseId === asset.caseId)
             ? s.cases.map((c) => (c.caseId === asset.caseId ? asset : c))
             : [asset, ...s.cases];
-<<<<<<< HEAD
           const existingFolder = s.folders[resolvedCaseId];
           const folder: PatientFolder = existingFolder
-            ? { ...existingFolder, docs: caseDocs, synthesis, reportReady: s.reportReady }
+            ? {
+                ...existingFolder,
+                docs: caseDocs,
+                synthesis,
+                reportReady: s.reportReady,
+                synthesisStale: false,
+                reportStale: s.reportStale,
+              }
             : {
                 caseId: resolvedCaseId,
                 patientName: synthesis.patientName,
                 mrn: synthesis.mrn,
                 createdAt: synthesis.createdAt,
                 docs: caseDocs,
-=======
-          const existingFolder = s.folders[caseId];
-          const folder: PatientFolder = existingFolder
-            ? { ...existingFolder, docs: s.docs, synthesis, reportReady: s.reportReady }
-            : {
-                caseId,
-                patientName: synthesis.patientName,
-                mrn: synthesis.mrn,
-                createdAt: synthesis.createdAt,
-                docs: s.docs,
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
                 synthesis,
                 reportReady: s.reportReady,
+                synthesisStale: false,
+                reportStale: false,
               };
           return {
             ...s,
             synthesis,
+            synthesisStale: false,
             cases,
-<<<<<<< HEAD
             activeCaseId: resolvedCaseId,
             folders: { ...s.folders, [resolvedCaseId]: folder },
-=======
-            activeCaseId: caseId,
-            folders: { ...s.folders, [caseId]: folder },
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
           };
         });
         return result;
@@ -602,19 +635,58 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
           const folder = s.synthesis ? s.folders[s.synthesis.caseId] : undefined;
           return {
             reportReady: true,
+            reportStale: false,
             reportsGenerated: s.reportReady ? s.reportsGenerated : s.reportsGenerated + 1,
             cases: s.cases.map((c) =>
               c.caseId === s.synthesis?.caseId ? { ...c, hasReport: true } : c,
             ),
             folders: folder
-              ? { ...s.folders, [folder.caseId]: { ...folder, reportReady: true } }
+              ? { ...s.folders, [folder.caseId]: { ...folder, reportReady: true, reportStale: false } }
               : s.folders,
+          };
+        }),
+      retryCaseDocuments: (caseId, docIds) =>
+        setState((s) => {
+          const folder = s.folders[caseId];
+          if (!folder) return s;
+          const ids = new Set(docIds);
+          const reset = (doc: ClinicalDoc) => ids.has(doc.id)
+            ? { ...doc, processing: true, analyzed: false, processed: false, processingError: undefined }
+            : doc;
+          const docs = s.docs.map(reset);
+          const nextFolder = {
+            ...folder,
+            docs: folder.docs.map(reset),
+            synthesisStale: true,
+            reportStale: true,
+            reportReady: false,
+          };
+          const base = {
+            ...s,
+            docs,
+            folders: { ...s.folders, [caseId]: nextFolder },
+            activeCaseId: caseId,
+            ocrComplete: false,
+            synthesisStale: true,
+            reportStale: true,
+            reportReady: false,
+          };
+          return {
+            ...base,
+            view: "ocr",
+            queuedBatches: mergeQueuedBatch(s.queuedBatches, {
+              caseId,
+              docIds: docIds.filter((id) => docs.some((doc) => doc.id === id)),
+              createdAt: Date.now(),
+              priority: "priority",
+              reason: "retry",
+              retryCount: Math.max(...docIds.map((id) => docs.find((doc) => doc.id === id)?.retryCount ?? 0), 0) + 1,
+            }),
           };
         }),
       beginBatch: () => patch({ batchActive: true }),
       endBatch: () => patch({ batchActive: false }),
       takeQueued: () => {
-<<<<<<< HEAD
         const batch = stateRef.current.queuedBatches[0] ?? null;
         if (batch) setState((s) => ({ ...s, queuedBatches: s.queuedBatches.slice(1) }));
         return batch;
@@ -625,12 +697,6 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
           docs: s.docs.map((doc) => docIds.includes(doc.id) ? { ...doc, caseId } : doc),
         })),
       setProcessingState: (changes) => patch(changes),
-=======
-        const ids = stateRef.current.queuedDocIds;
-        setState((s) => ({ ...s, queuedDocIds: [] }));
-        return ids;
-      },
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
       toggleSidebar: () => patch((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
       openCase: (caseId) => {
         const folder = stateRef.current.folders[caseId];
@@ -642,16 +708,14 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
           docs: folder.docs,
           synthesis: folder.synthesis,
           reportReady: folder.reportReady,
+          synthesisStale: folder.synthesisStale,
+          reportStale: folder.reportStale,
           ocrComplete:
             folder.docs.length > 0 &&
             folder.docs.every(
               (d) => d.analyzed && d.originalText.trim() && d.translatedText.trim(),
             ),
-<<<<<<< HEAD
           queuedBatches: [],
-=======
-          queuedDocIds: [],
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
           batchActive: false,
         }));
       },
@@ -664,7 +728,8 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
           ocrComplete: false,
           synthesis: null,
           reportReady: false,
-<<<<<<< HEAD
+          synthesisStale: false,
+          reportStale: false,
           queuedBatches: [],
           batchActive: false,
           view: "intake",
@@ -708,6 +773,7 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
             reportsGenerated: removedReport ? Math.max(0, s.reportsGenerated - 1) : s.reportsGenerated,
             folders: nextFolders,
             cases: nextCases,
+            queuedBatches: s.queuedBatches.filter((batch) => batch.caseId !== caseId),
             ...(isCurrentCase
               ? {
                   activeCaseId: null,
@@ -716,7 +782,8 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
                   ocrComplete: false,
                   synthesis: null,
                   reportReady: false,
-                  queuedBatches: [],
+                  synthesisStale: false,
+                  reportStale: false,
                   batchActive: false,
                 }
               : {}),
@@ -731,12 +798,6 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
 
         return true;
       },
-=======
-          queuedDocIds: [],
-          batchActive: false,
-          view: "intake",
-        }),
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
     };
   }, [state, hydrated, patch]);
 
@@ -776,7 +837,6 @@ function cleanTranslatedRecord(text: string): string {
 }
 
 function extractMedicationItems(text: string): Synthesis["medications"] {
-<<<<<<< HEAD
   if (!text || !text.trim()) return [];
 
   const nonDrugTerms = /\b(?:bilirubin|creatinine|blood urea|urea|bun|glucose|fasting glucose|plasma glucose|hba1c|cholesterol|ldl|hdl|triglycerides|haemoglobin|hemoglobin|platelet|platelets|sodium|potassium|wbc|rbc|calcium|troponin|sgot|sgpt|bilirubin|alkaline|blood pressure|pulse|spo2|heart rate|respiratory rate|ct ratio|cardiomegaly|effusion|infiltrate|consolidation|stent|angioplasty|catheterisation|ecg|x-ray|radiograph)\b/i;
@@ -982,19 +1042,6 @@ function mergeMedicationItems(
     if (!existing.timesPerDay && medication.timesPerDay) existing.timesPerDay = medication.timesPerDay;
   }
   return merged;
-=======
-  const lines = text.split("\n").map((line) => line.replace(/^\s*[|•\-\d.)]+\s*/, "").trim());
-  return lines
-    .filter((line) => /\b(?:tablet|tab\.?|capsule|mg|dose|antibiotic|analgesic|metformin|amlodipine|paracetamol|pantoprazole|drotaverine|rabeprazole|domperidone)\b/i.test(line))
-    .map((line) => {
-      const dosage = line.match(/\b(?:\d+(?:\.\d+)?\s*(?:mg|g|mcg|ml)|\d+\s*(?:tablet|tablets|capsule|capsules))\b/i)?.[0] ?? "Not stated";
-      const frequency = line.match(/\b(?:once|twice|three times|daily|weekly|nightly|as needed|every\s+\d+\s+hours?)\b[^.,;|]*/i)?.[0]?.trim() ?? "Not stated";
-      const name = line.split(/\s+(?:\d+(?:\.\d+)?\s*(?:mg|g|mcg|ml)|\d+\s*(?:tablet|tablets|capsule|capsules))\b/i)[0]?.replace(/^(?:tab\.?|tablet|capsule)\s+/i, "").trim() ?? line;
-      return { name, dosage, frequency, since: "Not specified" };
-    })
-    .filter((item, index, values) => item.name.length > 2 && values.findIndex((value) => value.name.toLowerCase() === item.name.toLowerCase()) === index)
-    .slice(0, 20);
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
 }
 
 function extractDate(text: string): string {

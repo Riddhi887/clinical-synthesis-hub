@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 import { useEffect, useRef, useState } from "react";
-=======
-import { useRef } from "react";
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
 import { toast } from "sonner";
 import {
   ArrowLeft,
@@ -14,16 +10,14 @@ import {
   FolderPlus,
   Languages,
   Plus,
-<<<<<<< HEAD
   Trash2,
-=======
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
   UserRound,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useClinicalStore, type PatientFolder } from "@/lib/clinical/store";
+import { isVisibleClinicalFile } from "@/lib/clinical/data";
 
 const formatDate = (ts?: number) =>
   ts
@@ -31,11 +25,7 @@ const formatDate = (ts?: number) =>
     : "—";
 
 export function PatientView() {
-<<<<<<< HEAD
   const { folders, activeCaseId, openCase, closeCase, startNewCase, deleteCase } = useClinicalStore();
-=======
-  const { folders, activeCaseId, openCase, closeCase, startNewCase } = useClinicalStore();
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
   const folder = activeCaseId ? folders[activeCaseId] : undefined;
 
   if (folder) return <PatientHub folder={folder} onClose={closeCase} />;
@@ -78,7 +68,7 @@ export function PatientView() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-foreground">{f.patientName}</p>
                   <p className="text-mono-xs text-muted-foreground">
-                    Case {f.caseId} · MRN {f.mrn} · {f.docs.length} record(s) · opened {formatDate(f.createdAt)}
+                    Case {f.caseId} · MRN {f.mrn} · {f.docs.filter((doc) => isVisibleClinicalFile(doc.name)).length} record(s) · opened {formatDate(f.createdAt)}
                   </p>
                 </div>
                 <Badge
@@ -90,7 +80,6 @@ export function PatientView() {
                 >
                   {(f.synthesis?.risk ?? "STABLE") === "STABLE" ? "Stable" : "Action required"}
                 </Badge>
-<<<<<<< HEAD
                 <div className="flex items-center gap-1.5">
                   <Button size="sm" variant="outline" onClick={() => openCase(f.caseId)}>
                     View patient folder
@@ -124,11 +113,6 @@ export function PatientView() {
                     <Trash2 className="size-4" />
                   </Button>
                 </div>
-=======
-                <Button size="sm" variant="outline" onClick={() => openCase(f.caseId)}>
-                  View patient folder
-                </Button>
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
               </li>
             ))}
           </ul>
@@ -139,8 +123,7 @@ export function PatientView() {
 }
 
 function PatientHub({ folder, onClose }: { folder: PatientFolder; onClose: () => void }) {
-<<<<<<< HEAD
-  const { addFiles, setView, deleteCase } = useClinicalStore();
+  const { addFiles, setView, deleteCase, retryCaseDocuments } = useClinicalStore();
   const inputRef = useRef<HTMLInputElement>(null);
   const reportInputRef = useRef<HTMLInputElement>(null);
   const [caseFiles, setCaseFiles] = useState<string[]>([]);
@@ -200,10 +183,6 @@ function PatientHub({ folder, onClose }: { folder: PatientFolder; onClose: () =>
       setFilesBusy(false);
     }
   };
-=======
-  const { addFiles, setView } = useClinicalStore();
-  const inputRef = useRef<HTMLInputElement>(null);
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
 
   const ingest = (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -211,6 +190,7 @@ function PatientHub({ folder, onClose }: { folder: PatientFolder; onClose: () =>
       Array.from(files).map((file) => ({
         name: file.name,
         sizeKb: Math.max(1, Math.round(file.size / 1024)),
+        caseId: folder.caseId,
         sourceFile: file,
       })),
     );
@@ -219,12 +199,14 @@ function PatientHub({ folder, onClose }: { folder: PatientFolder; onClose: () =>
     });
   };
 
-  const reviewed = folder.docs.filter((d) => d.analyzed);
-  const translated = folder.docs.filter((d) => d.translatedText.trim());
+  const visibleDocs = folder.docs.filter((d) => isVisibleClinicalFile(d.name));
+  const visibleReviewed = visibleDocs.filter((d) => d.analyzed);
+  const translated = visibleDocs.filter((d) => d.translatedText.trim());
+  const failed = visibleDocs.filter((d) => !d.processing && !d.analyzed);
 
   const cards = [
-    { label: "Imported records", value: folder.docs.length, icon: FileStack },
-    { label: "Reviewed records", value: reviewed.length, icon: ClipboardList },
+    { label: "Imported records", value: visibleDocs.length, icon: FileStack },
+    { label: "Reviewed records", value: visibleReviewed.length, icon: ClipboardList },
     { label: "Clinical summaries", value: folder.synthesis ? 1 : 0, icon: Languages },
     { label: "Executive reports", value: folder.reportReady ? 1 : 0, icon: FileText },
   ];
@@ -257,7 +239,6 @@ function PatientHub({ folder, onClose }: { folder: PatientFolder; onClose: () =>
                 e.target.value = "";
               }}
             />
-<<<<<<< HEAD
             <input
               ref={reportInputRef}
               type="file"
@@ -300,12 +281,6 @@ function PatientHub({ folder, onClose }: { folder: PatientFolder; onClose: () =>
             >
               <Trash2 className="mr-1.5 size-4" /> Delete case
             </Button>
-=======
-            <Button variant="outline" onClick={() => inputRef.current?.click()}>
-              <Plus className="mr-2 size-4" /> Add documents
-            </Button>
-            <Button onClick={() => setView("ocr")}>Open record workflow</Button>
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
           </div>
         </div>
       </section>
@@ -324,18 +299,36 @@ function PatientHub({ folder, onClose }: { folder: PatientFolder; onClose: () =>
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
-        <Slot title="Source records" hint="Raw intake — uploaded scans and reports" count={folder.docs.length}>
-          {folder.docs.length === 0 ? (
+        <Slot title="Source records" hint="Raw intake — uploaded scans and reports" count={visibleDocs.length}>
+          {visibleDocs.length === 0 ? (
             <SlotEmpty message="No source records in this folder yet." />
           ) : (
-            folder.docs.map((d) => (
-              <AssetRow
-                key={d.id}
-                name={d.name}
-                meta={`Record ID ${d.id.slice(0, 8).toUpperCase()} · ${d.pages} page(s) · ${d.sizeKb} KB · uploaded ${formatDate(d.uploadedAt)}`}
-                status={d.analyzed ? "Processed" : d.processing ? "Processing" : "Pending"}
-              />
-            ))
+            visibleDocs.map((d) => {
+              const status = d.analyzed ? "Processed" : d.processing ? "Processing" : "Pending";
+              return (
+                <div key={d.id} className="flex items-center gap-3 border-b border-border px-4 py-3 last:border-b-0">
+                  <div className="min-w-0 flex-1">
+                    <AssetRow
+                      name={d.name}
+                      meta={`Record ID ${d.id.slice(0, 8).toUpperCase()} · ${d.pages} page(s) · ${d.sizeKb} KB · uploaded ${formatDate(d.uploadedAt)}`}
+                      status={status}
+                    />
+                  </div>
+                  {status === "Pending" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        retryCaseDocuments(folder.caseId, [d.id]);
+                        toast.info("Document queued for retry", { description: `${d.name} remains in ${folder.caseId}.` });
+                      }}
+                    >
+                      Retry
+                    </Button>
+                  )}
+                </div>
+              );
+            })
           )}
         </Slot>
 
@@ -355,6 +348,11 @@ function PatientHub({ folder, onClose }: { folder: PatientFolder; onClose: () =>
         </Slot>
 
         <Slot title="Summaries & timeline assets" hint="Structured clinical findings for this case" count={folder.synthesis ? folder.synthesis.timeline.length : 0}>
+          {folder.synthesisStale && (
+            <p className="border-b border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-foreground">
+              This summary is outdated because the case has new or retried documents. Reprocess the case and rebuild the summary.
+            </p>
+          )}
           {folder.synthesis ? (
             folder.synthesis.timeline.map((t) => (
               <AssetRow
@@ -369,8 +367,8 @@ function PatientHub({ folder, onClose }: { folder: PatientFolder; onClose: () =>
           )}
         </Slot>
 
-        <Slot title="Formal executive reports" hint="Hospital reports ready for PDF / Word export" count={folder.reportReady ? 1 : 0}>
-          {folder.reportReady ? (
+        <Slot title="Formal executive reports" hint="Hospital reports ready for PDF / Word export" count={folder.reportReady && !folder.reportStale ? 1 : 0}>
+          {folder.reportReady && !folder.reportStale ? (
             <div className="px-4 py-3">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="min-w-0 flex-1 truncate text-sm text-foreground">
@@ -389,12 +387,14 @@ function PatientHub({ folder, onClose }: { folder: PatientFolder; onClose: () =>
             <div className="px-4 py-3">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="min-w-0 flex-1 truncate text-sm text-foreground">
-                  No report generated yet
+                  {folder.reportStale ? "Report outdated" : "No report generated yet"}
                 </p>
                 <Badge variant="secondary" className="text-mono-xs text-warning">Pending</Badge>
               </div>
               <p className="text-mono-xs text-muted-foreground">
-                Complete the record workflow to generate the formal report.
+                {folder.reportStale
+                  ? "Generate a new report after the updated case summary is ready."
+                  : "Complete the record workflow to generate the formal report."}
               </p>
               {folder.synthesis && (
                 <Button size="sm" variant="outline" className="mt-2" onClick={() => setView("report")}>
@@ -405,7 +405,24 @@ function PatientHub({ folder, onClose }: { folder: PatientFolder; onClose: () =>
           )}
         </Slot>
       </section>
-<<<<<<< HEAD
+
+      {failed.length > 0 && (
+        <section className="panel flex flex-wrap items-center justify-between gap-3 border-warning/40 bg-warning/5 p-4">
+          <div>
+            <p className="text-sm font-medium text-foreground">{failed.length} document(s) need attention</p>
+            <p className="text-mono-xs text-muted-foreground">Retry them in this patient case before rebuilding its summary.</p>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => {
+              retryCaseDocuments(folder.caseId, failed.map((doc) => doc.id));
+              toast.info("Documents queued for retry", { description: `Priority retry for ${folder.caseId}.` });
+            }}
+          >
+            Retry failed documents
+          </Button>
+        </section>
+      )}
 
       <section className="panel overflow-hidden">
         <header className="flex items-center gap-2 border-b border-border px-4 py-3">
@@ -420,7 +437,7 @@ function PatientHub({ folder, onClose }: { folder: PatientFolder; onClose: () =>
           <p className="px-4 py-6 text-sm text-muted-foreground">No manually stored reports yet.</p>
         ) : (
           <ul className="divide-y divide-border">
-            {caseFiles.map((filename) => (
+            {caseFiles.filter(isVisibleClinicalFile).map((filename) => (
               <li key={filename} className="flex items-center gap-3 px-4 py-3">
                 <FileText className="size-4 shrink-0 text-navy" />
                 <span className="min-w-0 flex-1 truncate text-sm text-foreground">{filename}</span>
@@ -439,8 +456,6 @@ function PatientHub({ folder, onClose }: { folder: PatientFolder; onClose: () =>
           </ul>
         )}
       </section>
-=======
->>>>>>> e0d9a72d36ad9936ddad13c6982739b5c1bd30ba
     </div>
   );
 }
