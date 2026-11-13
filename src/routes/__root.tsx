@@ -12,7 +12,7 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
-import { ClinicalStoreProvider } from "../lib/clinical/store";
+import { ClinicalStoreProvider } from "@/lib/clinical/store";
 
 function NotFoundComponent() {
   return (
