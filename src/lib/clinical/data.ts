@@ -28,7 +28,7 @@ export interface ClinicalDoc {
   medications?: MedicationRecord[];
   processing?: boolean;
   retryCount?: number;
-  processingError?: string;
+  processingError?: string | undefined;
   analyzed?: boolean;
   sourceFile?: File;
   language: string;

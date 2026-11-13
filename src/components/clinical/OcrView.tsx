@@ -101,7 +101,7 @@ export function OcrView() {
             originalText: result.ocr_text ?? "",
             translatedText: result.translated_text ?? "",
             processing: false,
-            processingError: undefined,
+            processingError: "",
             analyzed: true,
           });
           setBatchProgress(i, 92);
@@ -129,7 +129,7 @@ export function OcrView() {
         setBatchProgress(i, 92);
         updateStatus("Translating the text. This will take a few minutes");
         await wait(180);
-        updateDoc(doc.id, { processing: false, analyzed: true, processed: true, processingError: undefined });
+        updateDoc(doc.id, { processing: false, analyzed: true, processed: true, processingError: "" });
         setBatchProgress(i, 100);
       } else {
         failed += 1;

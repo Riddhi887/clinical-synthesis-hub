@@ -201,7 +201,7 @@ function mergeQueuedBatch(batches: QueuedBatch[], incoming: QueuedBatch): Queued
     return [...batches, incoming].sort((a, b) => Number(b.priority === "priority") - Number(a.priority === "priority"));
   }
   return batches
-    .map((batch) => batch.caseId === incoming.caseId
+    .map<QueuedBatch>((batch) => batch.caseId === incoming.caseId
       ? {
           ...batch,
           docIds: Array.from(new Set([...batch.docIds, ...incoming.docIds])),
@@ -471,6 +471,7 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
       removeDoc: (id) =>
         patch((s) => {
           const removed = s.docs.find((doc) => doc.id === id);
+          const removedFolder = removed?.caseId ? s.folders[removed.caseId] : undefined;
           return {
             docs: s.docs.filter((d) => d.id !== id),
             queuedBatches: s.queuedBatches
@@ -479,12 +480,12 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
             reportReady: false,
             synthesisStale: removed?.caseId ? true : s.synthesisStale,
             reportStale: removed?.caseId ? true : s.reportStale,
-            folders: removed?.caseId && s.folders[removed.caseId]
+            folders: removedFolder
               ? {
                   ...s.folders,
-                  [removed.caseId]: {
-                    ...s.folders[removed.caseId],
-                    docs: s.folders[removed.caseId].docs.filter((doc) => doc.id !== id),
+                    [removedFolder.caseId]: {
+                    ...removedFolder,
+                    docs: removedFolder.docs.filter((doc) => doc.id !== id),
                     synthesisStale: true,
                     reportStale: true,
                     reportReady: false,
@@ -738,7 +739,7 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
         // 1. Delete records folder from backend
         let backendDeleted = false;
         try {
-          const apiBase = import.meta.env.VITE_API_BASE_URL || "/api";
+          const apiBase = import.meta.env["VITE_API_BASE_URL"] || "/api";
           const res = await fetch(`${apiBase}/cases/${encodeURIComponent(caseId)}`, {
             method: "DELETE",
           }).catch(() => null);
@@ -973,9 +974,9 @@ function extractMedicationItems(text: string): Synthesis["medications"] {
     let name = "";
     const nameWithPrefixMatch = cleanLine.match(/^(?:tab\.?|tablet|cap\.?|capsule|syr\.?|syrup|inj\.?|injection|ointment)\s+([A-Za-z0-9/\-]+(?:\s+[A-Za-z0-9/\-]+)?)/i);
     if (nameWithPrefixMatch) {
-      name = nameWithPrefixMatch[1].trim();
+      name = (nameWithPrefixMatch[1] ?? "").trim();
     } else if (doseMatch) {
-      const beforeDose = cleanLine.split(doseMatch[0])[0].trim();
+      const beforeDose = (cleanLine.split(doseMatch[0])[0] ?? "").trim();
       const tokens = beforeDose.split(/[\s,–—:-]+/).filter((t) => t.length > 1 && !/^(?:tab\.?|tablet|cap\.?|capsule|prescribed|rx|take|give)$/i.test(t));
       if (tokens.length > 0) {
         name = tokens.slice(-2).join(" ");
@@ -985,7 +986,7 @@ function extractMedicationItems(text: string): Synthesis["medications"] {
     if (!name || name.length < 3) {
       const knownMatch = cleanLine.match(/\b(metformin|atorvastatin|aspirin|clopidogrel|amlodipine|pantoprazole|paracetamol|losartan|telmisartan|rosuvastatin|ramipril|enalapril|lisinopril|metoprolol|atenolol|carvedilol|furosemide|torsemide|spironolactone|glimepiride|gliclazide|dapagliflozin|empagliflozin|sitagliptin|vildagliptin|insulin|levothyroxine|omeprazole|rabeprazole|esomeprazole|ranitidine|famotidine|ibuprofen|diclofenac|tramadol|aceclofenac|drotaverine|amoxicillin|azithromycin|ciprofloxacin|levofloxacin|ceftriaxone|cefixime|doxycycline|montelukast|cetirizine|levocetirizine|salbutamol|budesonide|alprazolam|clonazepam|lorazepam|gabapentin|pregabalin)\b/i);
       if (knownMatch) {
-        name = knownMatch[1];
+        name = knownMatch[1] ?? "";
       }
     }
 
