@@ -28,7 +28,7 @@ export interface ClinicalDoc {
   medications?: MedicationRecord[];
   processing?: boolean;
   retryCount?: number;
-  processingError?: string;
+  processingError?: string | undefined;
   analyzed?: boolean;
   sourceFile?: File;
   language: string;
@@ -45,6 +45,15 @@ export interface ClinicalDoc {
 
 export function isVisibleClinicalFile(name: string): boolean {
   return !/\.(?:json|ico)$/i.test(name.trim());
+}
+
+export function isClinicalDocReadyForSynthesis(doc: ClinicalDoc): boolean {
+  return doc.origin === "sample" ||
+    (doc.analyzed === true && doc.translatedText.trim().length > 0);
+}
+
+export function areClinicalDocsProcessed(docs: ClinicalDoc[]): boolean {
+  return docs.length > 0 && docs.every(isClinicalDocReadyForSynthesis);
 }
 
 export interface TimelineEvent {

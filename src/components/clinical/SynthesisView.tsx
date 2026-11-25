@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { AlertTriangle, GitMerge, Stethoscope, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { Synthesis } from "@/lib/clinical/data";
+import { areClinicalDocsProcessed, type Synthesis } from "@/lib/clinical/data";
 import { useClinicalStore } from "@/lib/clinical/store";
 
 const RISK_STYLES: Record<string, string> = {
@@ -13,9 +13,10 @@ const RISK_STYLES: Record<string, string> = {
 };
 
 export function SynthesisView() {
-  const { docs, ocrComplete, synthesis, synthesisStale, buildSynthesis, setView } = useClinicalStore();
+  const { docs, synthesis, synthesisStale, buildSynthesis, setView } = useClinicalStore();
   const [busy, setBusy] = useState(false);
   const autoBuiltRef = useRef(false);
+  const docsReady = areClinicalDocsProcessed(docs);
   const sampleCaseReady = docs.length > 0 && docs.every((doc) => doc.origin === "sample");
 
   const build = () => {
@@ -30,11 +31,11 @@ export function SynthesisView() {
   };
 
   useEffect(() => {
-    if ((ocrComplete || sampleCaseReady) && docs.length > 0 && !busy && !autoBuiltRef.current) {
+    if ((docsReady || sampleCaseReady) && docs.length > 0 && !busy && !autoBuiltRef.current) {
       autoBuiltRef.current = true;
       if (!synthesis || synthesisStale) build();
     }
-  }, [ocrComplete, sampleCaseReady, docs.length, synthesis, synthesisStale, busy]);
+  }, [docsReady, sampleCaseReady, docs.length, synthesis, synthesisStale, busy]);
 
   return (
     <div className="space-y-6">
@@ -47,7 +48,7 @@ export function SynthesisView() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button onClick={build} disabled={busy || (!ocrComplete && !sampleCaseReady) || docs.length === 0}>
+          <Button onClick={build} disabled={busy || (!docsReady && !sampleCaseReady) || docs.length === 0}>
             <GitMerge className="mr-2 size-4" />
              {busy ? "Preparing…" : synthesis ? "Refresh summary" : "Prepare summary"}
           </Button>
@@ -57,7 +58,7 @@ export function SynthesisView() {
         </div>
       </section>
 
-      {!ocrComplete && !sampleCaseReady && (
+      {!docsReady && !sampleCaseReady && (
         <section className="panel p-10 text-center">
           <p className="text-sm text-muted-foreground">
              Process and translate the medical records before preparing the clinical summary.
@@ -74,7 +75,7 @@ export function SynthesisView() {
         </section>
       )}
 
-      {ocrComplete && !synthesis && (
+      {docsReady && !synthesis && (
         <section className="panel p-10 text-center">
           <GitMerge className="mx-auto size-8 text-navy" />
           <p className="mt-3 text-sm text-muted-foreground">

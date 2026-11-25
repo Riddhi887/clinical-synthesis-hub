@@ -4,13 +4,38 @@ import { Languages, ScanSearch } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { isVisibleClinicalFile, type ClinicalDoc, type MedicationRecord } from "@/lib/clinical/data";
+import {
+  isVisibleClinicalFile,
+  type ClinicalDoc,
+  type MedicationRecord,
+} from "@/lib/clinical/data";
 import { newCaseId, useClinicalStore } from "@/lib/clinical/store";
 
 let activeBatchRunner = false;
 
 export function OcrView() {
-  const { docs, ocrComplete, updateDoc, markOcrComplete, buildSynthesis, setView, openCase, beginBatch, endBatch, takeQueued, getDocs, batchActive, activeCaseId, queuedBatches, assignDocsToCase, processingCaseId, processingDocName, processingProgress, processingStatus, setProcessingState } = useClinicalStore();
+  const {
+    docs,
+    ocrComplete,
+    updateDoc,
+    markOcrComplete,
+    buildSynthesis,
+    setView,
+    openCase,
+    beginBatch,
+    endBatch,
+    takeQueued,
+    getDocs,
+    batchActive,
+    activeCaseId,
+    queuedBatches,
+    assignDocsToCase,
+    processingCaseId,
+    processingDocName,
+    processingProgress,
+    processingStatus,
+    setProcessingState,
+  } = useClinicalStore();
   const runningRef = useRef(false);
   const runRef = useRef<(() => Promise<void>) | null>(null);
   const [running, setRunning] = useState(false);
@@ -18,7 +43,7 @@ export function OcrView() {
   const [active, setActive] = useState<string | null>(processingDocName);
   const [status, setStatus] = useState(processingStatus);
   const [statusTick, setStatusTick] = useState(0);
-  
+
   const [selected, setSelected] = useState<string | null>(docs[0]?.id ?? null);
   const apiBase = import.meta.env["VITE_API_BASE_URL"] ?? "/api";
 
@@ -62,16 +87,51 @@ export function OcrView() {
       updateActive(doc.name);
       setBatchProgress(i, 5);
       updateStatus("Retrieving the text");
-      if (doc.sourceFile instanceof File) {
-        const formData = new FormData();
-        formData.append("file", doc.sourceFile);
-        formData.append("case_id", caseId);
-        formData.append("document_id", doc.id);
+      if (doc.origin === "sample") {
+        setBatchProgress(i, 35);
+        updateStatus("Rasterizing and recognizing the text");
+        await wait(180);
+        setBatchProgress(i, 92);
+        updateStatus("Translating the text. This will take a few minutes");
+        await wait(180);
+        updateDoc(doc.id, {
+          processing: false,
+          analyzed: true,
+          processed: true,
+          processingError: undefined,
+        });
+        setBatchProgress(i, 100);
+      } else {
         try {
-          const response = await fetch(`${apiBase}/process-document`, { method: "POST", body: formData });
+          let sourceFile = doc.sourceFile instanceof File ? doc.sourceFile : undefined;
+          if (!sourceFile && doc.caseId) {
+            const sourceResponse = await fetch(
+              `${apiBase}/cases/${encodeURIComponent(doc.caseId)}/records/${encodeURIComponent(doc.name)}`,
+            );
+            if (!sourceResponse.ok) {
+              throw new Error(
+                `Stored document could not be retrieved (status ${sourceResponse.status}).`,
+              );
+            }
+            const sourceBlob = await sourceResponse.blob();
+            sourceFile = new File([sourceBlob], doc.name, { type: sourceBlob.type });
+          }
+          if (!sourceFile) {
+            throw new Error("Document source is unavailable for processing.");
+          }
+          const formData = new FormData();
+          formData.append("file", sourceFile);
+          formData.append("case_id", caseId);
+          formData.append("document_id", doc.id);
+          const response = await fetch(`${apiBase}/process-document`, {
+            method: "POST",
+            body: formData,
+          });
           if (!response.ok) {
             const detail = await response.text();
-            throw new Error(`Request failed with status ${response.status}: ${detail.slice(0, 240)}`);
+            throw new Error(
+              `Request failed with status ${response.status}: ${detail.slice(0, 240)}`,
+            );
           }
           setBatchProgress(i, 35);
           updateStatus("Rasterizing and recognizing the text");
@@ -122,19 +182,6 @@ export function OcrView() {
             description: error instanceof Error ? error.message : "OCR or translation failed.",
           });
         }
-      } else if (doc.origin === "sample") {
-        setBatchProgress(i, 35);
-        updateStatus("Rasterizing and recognizing the text");
-        await wait(180);
-        setBatchProgress(i, 92);
-        updateStatus("Translating the text. This will take a few minutes");
-        await wait(180);
-        updateDoc(doc.id, { processing: false, analyzed: true, processed: true, processingError: undefined });
-        setBatchProgress(i, 100);
-      } else {
-        failed += 1;
-        updateDoc(doc.id, { processing: false, analyzed: false, processingError: "Document source is unavailable for processing." });
-        setBatchProgress(i, 100);
       }
       if (i < total - 1) updateStatus("Retrieving the text");
     }
@@ -143,7 +190,13 @@ export function OcrView() {
 
   const run = async () => {
     // batchActive also covers a queue drain still running from another mount of this view.
-    if (!getDocs().length || runningRef.current || activeBatchRunner || (batchActive && queuedBatches.length === 0)) return;
+    if (
+      !getDocs().length ||
+      runningRef.current ||
+      activeBatchRunner ||
+      (batchActive && queuedBatches.length === 0)
+    )
+      return;
     activeBatchRunner = true;
     runningRef.current = true;
     setRunning(true);
@@ -156,7 +209,7 @@ export function OcrView() {
       ? []
       : getDocs()
           .filter((doc) => !queuedIds.has(doc.id))
-          .filter((doc) => activeCaseId ? doc.caseId === currentCaseId : !doc.caseId)
+          .filter((doc) => (activeCaseId ? doc.caseId === currentCaseId : !doc.caseId))
           .filter((doc) => !doc.processed || !doc.analyzed)
           .map((doc) => doc.id);
     let finalCaseId = currentCaseId;
@@ -168,9 +221,11 @@ export function OcrView() {
       failed = await processIds(initialIds, currentCaseId);
       markOcrComplete(activeCaseId ? currentCaseId : undefined);
       const currentCaseDocs = getDocs().filter((doc) => doc.caseId === currentCaseId);
-      const caseComplete = currentCaseDocs.length > 0 && currentCaseDocs.every(
-        (doc) => doc.analyzed && doc.originalText.trim() && doc.translatedText.trim(),
-      );
+      const caseComplete =
+        currentCaseDocs.length > 0 &&
+        currentCaseDocs.every(
+          (doc) => doc.analyzed && doc.originalText.trim() && doc.translatedText.trim(),
+        );
       if (caseComplete) {
         buildSynthesis(currentCaseId);
         toast.success("Patient case documents processed", {
@@ -192,9 +247,11 @@ export function OcrView() {
       failed += await processIds(next.docIds, next.caseId);
       markOcrComplete(next.caseId);
       const queuedCaseDocs = getDocs().filter((doc) => doc.caseId === next.caseId);
-      const queuedCaseComplete = queuedCaseDocs.length > 0 && queuedCaseDocs.every(
-        (doc) => doc.analyzed && doc.originalText.trim() && doc.translatedText.trim(),
-      );
+      const queuedCaseComplete =
+        queuedCaseDocs.length > 0 &&
+        queuedCaseDocs.every(
+          (doc) => doc.analyzed && doc.originalText.trim() && doc.translatedText.trim(),
+        );
       if (queuedCaseComplete) {
         buildSynthesis(next.caseId);
         toast.success("Queued patient case documents processed", {
@@ -229,7 +286,13 @@ export function OcrView() {
 
   useEffect(() => {
     const hasRunnableDocuments = docs.some((doc) => !doc.analyzed && !doc.processingError);
-    if (hasRunnableDocuments && !ocrComplete && !running && (!batchActive || queuedBatches.length > 0) && !runningRef.current) {
+    if (
+      hasRunnableDocuments &&
+      !ocrComplete &&
+      !running &&
+      (!batchActive || queuedBatches.length > 0) &&
+      !runningRef.current
+    ) {
       void runRef.current?.().catch((error) => {
         activeBatchRunner = false;
         console.error("Queued document processing stopped unexpectedly", error);
@@ -241,14 +304,14 @@ export function OcrView() {
     ? docs.filter((doc) => doc.caseId === activeCaseId && isVisibleClinicalFile(doc.name))
     : docs.filter((doc) => !doc.caseId && isVisibleClinicalFile(doc.name));
   const completedCaseDocs = activeDocs.filter((doc) => doc.processed).length;
-  const caseProgress = activeDocs.length ? Math.round((completedCaseDocs / activeDocs.length) * 100) : 0;
+  const caseProgress = activeDocs.length
+    ? Math.round((completedCaseDocs / activeDocs.length) * 100)
+    : 0;
   const current: ClinicalDoc | undefined =
     activeDocs.find((d) => d.id === selected) ?? activeDocs[0];
   const isSampleCase =
     activeDocs.length > 0 &&
-    activeDocs.every(
-      (doc) => doc.origin === "sample" || /_(TA|TE|ES|HI|EN)_/i.test(doc.name),
-    );
+    activeDocs.every((doc) => doc.origin === "sample" || /_(TA|TE|ES|HI|EN)_/i.test(doc.name));
   const hasActualAnalysis = current?.origin === "sample" || current?.analyzed === true;
   const canContinueToSynthesis = activeDocs.length > 0 && progress >= 100 && !running;
 
@@ -257,12 +320,19 @@ export function OcrView() {
       <section className="panel flex flex-wrap items-end justify-between gap-4 p-5">
         <div className="space-y-1">
           <p className="text-mono-xs uppercase tracking-widest text-muted-foreground">step 2</p>
-           <h2 className="text-2xl font-semibold text-foreground">Processing &amp; translating medical records</h2>
+          <h2 className="text-2xl font-semibold text-foreground">
+            Processing &amp; translating medical records
+          </h2>
           <p className="max-w-2xl text-sm text-muted-foreground">
-             Review scanned records, recognise medical details, and prepare clear English clinical text.
+            Review scanned records, recognise medical details, and prepare clear English clinical
+            text.
           </p>
         </div>
-        <Button variant="outline" disabled={!canContinueToSynthesis} onClick={() => setView("synthesis")}>
+        <Button
+          variant="outline"
+          disabled={!canContinueToSynthesis}
+          onClick={() => setView("synthesis")}
+        >
           Continue to synthesis
         </Button>
       </section>
@@ -271,7 +341,7 @@ export function OcrView() {
         <section className="panel p-10 text-center">
           <ScanSearch className="mx-auto size-8 text-navy" />
           <p className="mt-3 text-sm text-muted-foreground">
-             No records have been added. Return to Import Records to upload or load the sample case.
+            No records have been added. Return to Import Records to upload or load the sample case.
           </p>
           <Button className="mt-4" variant="outline" onClick={() => setView("intake")}>
             Go to intake
@@ -296,13 +366,21 @@ export function OcrView() {
           {queuedBatches.length > 0 && (
             <section className="panel space-y-3 p-5">
               <div className="flex items-center justify-between gap-3">
-                <p className="text-mono-xs uppercase tracking-widest text-muted-foreground">Queued patient batches</p>
+                <p className="text-mono-xs uppercase tracking-widest text-muted-foreground">
+                  Queued patient batches
+                </p>
                 <span className="text-mono-xs text-warning">{queuedBatches.length} waiting</span>
               </div>
               {queuedBatches.map((batch, index) => (
                 <p key={batch.caseId} className="text-sm text-foreground">
-                  Queue {index + 1}: {batch.priority === "priority" ? `${batch.reason === "retry" ? "Retry" : "Update"}: ` : "Queued: "}
-                  {batch.caseId} · {batch.docIds.map((id) => docs.find((doc) => doc.id === id)?.name ?? "Document").join(", ")}
+                  Queue {index + 1}:{" "}
+                  {batch.priority === "priority"
+                    ? `${batch.reason === "retry" ? "Retry" : "Update"}: `
+                    : "Queued: "}
+                  {batch.caseId} ·{" "}
+                  {batch.docIds
+                    .map((id) => docs.find((doc) => doc.id === id)?.name ?? "Document")
+                    .join(", ")}
                 </p>
               ))}
             </section>
@@ -318,11 +396,7 @@ export function OcrView() {
                     key={d.id}
                     size="sm"
                     variant={current?.id === d.id ? "default" : "outline"}
-                    className={
-                      current?.id === d.id
-                        ? "text-primary-foreground"
-                        : "text-mono-xs"
-                    }
+                    className={current?.id === d.id ? "text-primary-foreground" : "text-mono-xs"}
                     onClick={() => setSelected(d.id)}
                   >
                     {isSampleCase ? d.language.split(" ")[0] : d.name}
@@ -339,7 +413,9 @@ export function OcrView() {
                   </Badge>
                   <span className="text-mono-xs text-muted-foreground">{current.name}</span>
                   {current.processingError && (
-                    <span className="text-mono-xs text-destructive">retry needed: {current.processingError}</span>
+                    <span className="text-mono-xs text-destructive">
+                      retry needed: {current.processingError}
+                    </span>
                   )}
                   {hasActualAnalysis && current.patientName && (
                     <span className="text-mono-xs text-foreground">
@@ -347,19 +423,25 @@ export function OcrView() {
                     </span>
                   )}
                   <span className="rounded-full bg-success/15 px-2 py-0.5 text-mono-xs text-success">
-                     {hasActualAnalysis ? `recognition ${current.ocrConfidence}%` : "OCR pending"}
+                    {hasActualAnalysis ? `recognition ${current.ocrConfidence}%` : "OCR pending"}
                   </span>
                   <span className="rounded-full bg-navy/10 px-2 py-0.5 text-mono-xs text-navy">
-                    {hasActualAnalysis ? `translation ${current.translationQuality}%` : "translation pending"}
+                    {hasActualAnalysis
+                      ? `translation ${current.translationQuality}%`
+                      : "translation pending"}
                   </span>
                 </div>
 
                 <div className="grid gap-4 lg:grid-cols-2">
                   <Panel title={`Original scan text — ${current.language}`}>
-                    {hasActualAnalysis ? current.originalText : "Waiting for rasterization and OCR..."}
+                    {hasActualAnalysis
+                      ? current.originalText
+                      : "Waiting for rasterization and OCR..."}
                   </Panel>
                   <Panel title="Formal English clinical text">
-                    {hasActualAnalysis ? current.translatedText : "Waiting for English translation..."}
+                    {hasActualAnalysis
+                      ? current.translatedText
+                      : "Waiting for English translation..."}
                   </Panel>
                 </div>
               </div>
@@ -372,7 +454,13 @@ export function OcrView() {
 }
 
 function formatLanguage(code?: string) {
-  const names: Record<string, string> = { hi: "Hindi", ta: "Tamil", te: "Telugu", en: "English", es: "Spanish" };
+  const names: Record<string, string> = {
+    hi: "Hindi",
+    ta: "Tamil",
+    te: "Telugu",
+    en: "English",
+    es: "Spanish",
+  };
   return names[code?.toLowerCase() ?? ""] ?? code ?? "Unknown";
 }
 

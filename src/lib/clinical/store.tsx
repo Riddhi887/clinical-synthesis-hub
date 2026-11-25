@@ -10,6 +10,8 @@ import {
 } from "react";
 import {
   SAMPLE_CASE,
+  areClinicalDocsProcessed,
+  isClinicalDocReadyForSynthesis,
   type ClinicalDoc,
   type MedicationRecord,
   type Synthesis,
@@ -142,7 +144,7 @@ function readWorkspaceArchive(email: string): WorkspaceSnapshot {
     if (!raw) return emptyWorkspaceSnapshot();
     const parsed = JSON.parse(raw) as Partial<WorkspaceSnapshot>;
     return {
-      docs: stripFileHandles(parsed.docs ?? []),
+      docs: uniqueCaseDocs(stripFileHandles(parsed.docs ?? [])),
       ocrComplete: parsed.ocrComplete ?? false,
       synthesis: parsed.synthesis ?? null,
       reportReady: parsed.reportReady ?? false,
@@ -152,7 +154,7 @@ function readWorkspaceArchive(email: string): WorkspaceSnapshot {
       folders: Object.fromEntries(
         Object.entries(parsed.folders ?? {}).map(([id, folder]) => [
           id,
-          { ...folder, docs: stripFileHandles(folder.docs) },
+          { ...folder, docs: uniqueCaseDocs(stripFileHandles(folder.docs)) },
         ]),
       ),
       reportsGenerated: parsed.reportsGenerated ?? 0,
@@ -201,7 +203,7 @@ function mergeQueuedBatch(batches: QueuedBatch[], incoming: QueuedBatch): Queued
     return [...batches, incoming].sort((a, b) => Number(b.priority === "priority") - Number(a.priority === "priority"));
   }
   return batches
-    .map((batch) => batch.caseId === incoming.caseId
+    .map((batch): QueuedBatch => batch.caseId === incoming.caseId
       ? {
           ...batch,
           docIds: Array.from(new Set([...batch.docIds, ...incoming.docIds])),
@@ -211,6 +213,14 @@ function mergeQueuedBatch(batches: QueuedBatch[], incoming: QueuedBatch): Queued
         }
       : batch)
     .sort((a, b) => Number(b.priority === "priority") - Number(a.priority === "priority"));
+}
+
+function uniqueCaseDocs(docs: ClinicalDoc[]): ClinicalDoc[] {
+  const docsByName = new Map<string, ClinicalDoc>();
+  for (const doc of docs) {
+    docsByName.set(`${doc.caseId ?? ""}\u0000${doc.name}`, doc);
+  }
+  return Array.from(docsByName.values());
 }
 
 interface StoreValue extends PersistedState {
@@ -280,11 +290,11 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
         setState({
           ...initialState,
           ...parsed,
-          docs: cleanDocs(parsed.docs ?? []),
+          docs: uniqueCaseDocs(cleanDocs(parsed.docs ?? [])),
           folders: Object.fromEntries(
             Object.entries(parsed.folders ?? {}).map(([id, f]) => [id, {
               ...f,
-              docs: cleanDocs(f.docs),
+              docs: uniqueCaseDocs(cleanDocs(f.docs)),
               synthesisStale: f.synthesisStale ?? false,
               reportStale: f.reportStale ?? false,
             }]),
@@ -345,7 +355,10 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
         const importCaseId = requestedCaseId ?? (stateRef.current.view === "intake" || stateRef.current.batchActive
           ? newCaseId()
           : undefined);
-        const created: ClinicalDoc[] = files.map((f) => {
+        const filesToAdd = importCaseId
+          ? Array.from(new Map(files.map((file) => [file.name, file])).values())
+          : files;
+        const created: ClinicalDoc[] = filesToAdd.map((f) => {
           return {
             id: newUuid(),
             name: f.name,
@@ -371,8 +384,41 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
         setState((s) => {
           const existingFolder = importCaseId ? s.folders[importCaseId] : undefined;
           const isCaseUpdate = Boolean(existingFolder);
+          const canonicalFolderDocs = existingFolder ? uniqueCaseDocs(existingFolder.docs) : [];
+          const replacedNames = new Set(created.map((doc) => doc.name));
+          const nextFolderDocs = existingFolder
+            ? [
+                ...canonicalFolderDocs.filter((doc) => !replacedNames.has(doc.name)),
+                ...created,
+              ]
+            : [];
+          const retainedIds = new Set(nextFolderDocs.map((doc) => doc.id));
+          const removedDocIds = new Set(
+            existingFolder
+              ? [
+                  ...existingFolder.docs.filter((doc) => !retainedIds.has(doc.id)),
+                  ...s.docs.filter(
+                    (doc) =>
+                      doc.caseId === importCaseId &&
+                      !nextFolderDocs.some((folderDoc) => folderDoc.id === doc.id),
+                  ),
+                ].map((doc) => doc.id)
+              : [],
+          );
+          const docs = existingFolder
+            ? [
+                ...s.docs.filter((doc) => doc.caseId !== importCaseId),
+                ...nextFolderDocs,
+              ]
+            : [...s.docs, ...created];
+          const queuedBatches = s.queuedBatches
+            .map((batch) => ({
+              ...batch,
+              docIds: batch.docIds.filter((id) => !removedDocIds.has(id)),
+            }))
+            .filter((batch) => batch.docIds.length > 0);
           const queued = (s.batchActive || isCaseUpdate) && importCaseId
-            ? mergeQueuedBatch(s.queuedBatches, {
+            ? mergeQueuedBatch(queuedBatches, {
                 caseId: importCaseId,
                 docIds: created.map((d) => d.id),
                 createdAt: Date.now(),
@@ -383,7 +429,7 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
             : s.queuedBatches;
           return {
             ...s,
-            docs: [...s.docs, ...created],
+            docs,
             // While a batch is processing, new files join the isolated queue instead
             // of the active batch stream.
             queuedBatches: queued,
@@ -398,7 +444,7 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
                   ...s.folders,
                   [existingFolder.caseId]: {
                     ...existingFolder,
-                    docs: [...existingFolder.docs, ...created],
+                    docs: nextFolderDocs,
                     synthesisStale: true,
                     reportStale: true,
                     reportReady: false,
@@ -462,29 +508,46 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
           ...d,
           id: newUuid(),
           origin: "sample" as const,
-          analyzed: true,
+          analyzed: false,
           processed: false,
           uploadedAt: Date.now(),
         }));
-        patch({ docs: created, activeCaseId: null, ocrComplete: false, reportReady: false, synthesis: null, synthesisStale: false, reportStale: false, logs: [], queuedBatches: [], batchActive: false });
+        patch({
+          docs: created,
+          activeCaseId: null,
+          ocrComplete: false,
+          reportReady: false,
+          synthesis: null,
+          synthesisStale: false,
+          reportStale: false,
+          logs: [],
+          queuedBatches: [],
+          batchActive: false,
+          processingCaseId: null,
+          processingDocName: null,
+          processingProgress: 0,
+          processingStatus: "Waiting to process records",
+        });
       },
       removeDoc: (id) =>
         patch((s) => {
           const removed = s.docs.find((doc) => doc.id === id);
+          const removedCaseId = removed?.caseId;
+          const removedFolder = removedCaseId ? s.folders[removedCaseId] : undefined;
           return {
             docs: s.docs.filter((d) => d.id !== id),
             queuedBatches: s.queuedBatches
               .map((batch) => ({ ...batch, docIds: batch.docIds.filter((docId) => docId !== id) }))
               .filter((batch) => batch.docIds.length > 0),
             reportReady: false,
-            synthesisStale: removed?.caseId ? true : s.synthesisStale,
-            reportStale: removed?.caseId ? true : s.reportStale,
-            folders: removed?.caseId && s.folders[removed.caseId]
+            synthesisStale: removedCaseId ? true : s.synthesisStale,
+            reportStale: removedCaseId ? true : s.reportStale,
+            folders: removedCaseId && removedFolder
               ? {
                   ...s.folders,
-                  [removed.caseId]: {
-                    ...s.folders[removed.caseId],
-                    docs: s.folders[removed.caseId].docs.filter((doc) => doc.id !== id),
+                  [removedCaseId]: {
+                    ...removedFolder,
+                    docs: removedFolder.docs.filter((doc) => doc.id !== id),
                     synthesisStale: true,
                     reportStale: true,
                     reportReady: false,
@@ -505,13 +568,23 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
         patch((s) => {
           const caseDocs = caseId ? s.docs.filter((doc) => doc.caseId === caseId) : s.docs;
           const targetDocs = caseDocs.length > 0 ? caseDocs : s.docs;
-          const complete = targetDocs.length > 0 && targetDocs.every(
-            (doc) => doc.origin === "sample" || (doc.analyzed && doc.originalText.trim() && doc.translatedText.trim()),
+          const complete = areClinicalDocsProcessed(targetDocs);
+          const docs = s.docs.map((doc) => doc.caseId === caseId
+            ? { ...doc, processed: complete && Boolean(doc.analyzed), processing: false }
+            : caseId ? doc : { ...doc, processed: complete && Boolean(doc.analyzed), processing: false });
+          const updatedCaseIds = new Set(
+            targetDocs.map((doc) => doc.caseId).filter((id): id is string => Boolean(id)),
           );
           return {
-            docs: s.docs.map((doc) => doc.caseId === caseId
-              ? { ...doc, processed: complete && Boolean(doc.analyzed), processing: false }
-              : caseId ? doc : { ...doc, processed: complete && Boolean(doc.analyzed), processing: false }),
+            docs,
+            folders: Object.fromEntries(
+              Object.entries(s.folders).map(([id, folder]) => [
+                id,
+                updatedCaseIds.has(id)
+                  ? { ...folder, docs: docs.filter((doc) => doc.caseId === id) }
+                  : folder,
+              ]),
+            ),
             ocrComplete: complete,
           };
         }),
@@ -520,9 +593,7 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
         setState((s) => {
           const targetCaseId = caseId ?? s.activeCaseId;
           const caseDocs = targetCaseId ? s.docs.filter((doc) => doc.caseId === targetCaseId) : s.docs;
-          const processedDocs = s.docs.filter(
-            (doc) => caseDocs.includes(doc) && (doc.processed || doc.origin === "sample") && doc.translatedText.trim(),
-          );
+          const processedDocs = caseDocs.filter(isClinicalDocReadyForSynthesis);
           const cleanedDocs = processedDocs.map((doc) => ({
             doc,
             text: cleanTranslatedRecord(doc.translatedText),
@@ -698,27 +769,43 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
         })),
       setProcessingState: (changes) => patch(changes),
       toggleSidebar: () => patch((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
-      openCase: (caseId) => {
-        const folder = stateRef.current.folders[caseId];
-        if (!folder) return;
-        setState((s) => ({
-          ...s,
-          activeCaseId: caseId,
-          view: "patient",
-          docs: folder.docs,
-          synthesis: folder.synthesis,
-          reportReady: folder.reportReady,
-          synthesisStale: folder.synthesisStale,
-          reportStale: folder.reportStale,
-          ocrComplete:
-            folder.docs.length > 0 &&
-            folder.docs.every(
-              (d) => d.analyzed && d.originalText.trim() && d.translatedText.trim(),
+      openCase: (caseId) =>
+        setState((s) => {
+          const folder = s.folders[caseId];
+          if (!folder) return s;
+          const docs = uniqueCaseDocs(folder.docs);
+          const hasDuplicateFiles = docs.length !== folder.docs.length;
+          const nextFolder = {
+            ...folder,
+            docs,
+            ...(hasDuplicateFiles
+              ? { synthesisStale: true, reportStale: true, reportReady: false }
+              : {}),
+          };
+          return {
+            ...s,
+            activeCaseId: caseId,
+            view: "patient",
+            docs,
+            folders: { ...s.folders, [caseId]: nextFolder },
+            cases: s.cases.map((item) =>
+              item.caseId === caseId
+                ? {
+                    ...item,
+                    docCount: docs.length,
+                    hasReport: nextFolder.reportReady && !nextFolder.reportStale,
+                  }
+                : item,
             ),
-          queuedBatches: [],
-          batchActive: false,
-        }));
-      },
+            synthesis: folder.synthesis,
+            reportReady: nextFolder.reportReady,
+            synthesisStale: nextFolder.synthesisStale,
+            reportStale: nextFolder.reportStale,
+            ocrComplete: areClinicalDocsProcessed(docs),
+            queuedBatches: [],
+            batchActive: false,
+          };
+        }),
       closeCase: () => patch({ activeCaseId: null }),
       startNewCase: () =>
         patch({
@@ -738,7 +825,7 @@ export function ClinicalStoreProvider({ children }: { children: ReactNode }) {
         // 1. Delete records folder from backend
         let backendDeleted = false;
         try {
-          const apiBase = import.meta.env.VITE_API_BASE_URL || "/api";
+          const apiBase = import.meta.env["VITE_API_BASE_URL"] || "/api";
           const res = await fetch(`${apiBase}/cases/${encodeURIComponent(caseId)}`, {
             method: "DELETE",
           }).catch(() => null);
@@ -972,10 +1059,11 @@ function extractMedicationItems(text: string): Synthesis["medications"] {
 
     let name = "";
     const nameWithPrefixMatch = cleanLine.match(/^(?:tab\.?|tablet|cap\.?|capsule|syr\.?|syrup|inj\.?|injection|ointment)\s+([A-Za-z0-9/\-]+(?:\s+[A-Za-z0-9/\-]+)?)/i);
-    if (nameWithPrefixMatch) {
-      name = nameWithPrefixMatch[1].trim();
-    } else if (doseMatch) {
-      const beforeDose = cleanLine.split(doseMatch[0])[0].trim();
+    const nameFromPrefix = nameWithPrefixMatch?.[1];
+    if (nameFromPrefix) {
+      name = nameFromPrefix.trim();
+    } else if (doseMatch?.[0]) {
+      const beforeDose = cleanLine.split(doseMatch[0])[0]?.trim() ?? "";
       const tokens = beforeDose.split(/[\s,–—:-]+/).filter((t) => t.length > 1 && !/^(?:tab\.?|tablet|cap\.?|capsule|prescribed|rx|take|give)$/i.test(t));
       if (tokens.length > 0) {
         name = tokens.slice(-2).join(" ");
@@ -984,9 +1072,7 @@ function extractMedicationItems(text: string): Synthesis["medications"] {
 
     if (!name || name.length < 3) {
       const knownMatch = cleanLine.match(/\b(metformin|atorvastatin|aspirin|clopidogrel|amlodipine|pantoprazole|paracetamol|losartan|telmisartan|rosuvastatin|ramipril|enalapril|lisinopril|metoprolol|atenolol|carvedilol|furosemide|torsemide|spironolactone|glimepiride|gliclazide|dapagliflozin|empagliflozin|sitagliptin|vildagliptin|insulin|levothyroxine|omeprazole|rabeprazole|esomeprazole|ranitidine|famotidine|ibuprofen|diclofenac|tramadol|aceclofenac|drotaverine|amoxicillin|azithromycin|ciprofloxacin|levofloxacin|ceftriaxone|cefixime|doxycycline|montelukast|cetirizine|levocetirizine|salbutamol|budesonide|alprazolam|clonazepam|lorazepam|gabapentin|pregabalin)\b/i);
-      if (knownMatch) {
-        name = knownMatch[1];
-      }
+      name = knownMatch?.[1] ?? name;
     }
 
     name = name.replace(/^(?:tab\.?|tablet|cap\.?|capsule)\s+/i, "").trim();

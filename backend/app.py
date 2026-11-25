@@ -14,6 +14,7 @@ import numpy as np
 import pytesseract
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from langdetect import detect
 from PIL import Image, ImageOps
 from pypdf import PdfReader
@@ -668,6 +669,20 @@ async def upload_case_record(case_id: str, file: UploadFile = File(...)) -> dict
     with destination.open("wb") as output:
         shutil.copyfileobj(file.file, output)
     return {"status": "stored", "case_id": safe_id, "filename": safe_name}
+
+
+@app.get("/cases/{case_id}/records/{filename}")
+@app.get("/api/cases/{case_id}/records/{filename}")
+def get_case_record(case_id: str, filename: str) -> FileResponse:
+    safe_id = re.sub(r"[^A-Za-z0-9_-]", "", case_id)
+    safe_name = Path(filename).name
+    if not safe_id or not safe_name or safe_name in {".", ".."}:
+        raise HTTPException(status_code=400, detail="Invalid case ID or filename")
+
+    record_path = RECORDS_DIR / safe_id / safe_name
+    if not record_path.is_file():
+        raise HTTPException(status_code=404, detail="Case record not found")
+    return FileResponse(record_path, filename=safe_name)
 
 
 @app.delete("/cases/{case_id}/records/{filename}")
