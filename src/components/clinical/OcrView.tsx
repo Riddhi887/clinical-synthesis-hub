@@ -161,7 +161,7 @@ export function OcrView() {
             originalText: result.ocr_text ?? "",
             translatedText: result.translated_text ?? "",
             processing: false,
-            processingError: undefined,
+            processingError: "",
             analyzed: true,
           });
           setBatchProgress(i, 92);
